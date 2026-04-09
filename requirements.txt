@@ -1,0 +1,34 @@
+# Recommended Python: 3.8
+# External tools still required outside pip:
+# - 7-Zip (for dataset/download_av1m_meta.py)
+# - AV-HuBERT assets under resources/
+
+# Core runtime
+numpy<2
+PyYAML
+tqdm
+requests
+huggingface_hub
+
+# Training
+torch 
+
+# AV-HuBERT / preprocessing
+opencv-python==4.5.4.60
+scikit-image==0.17.2
+dlib==19.22.1
+python-speech-features==0.6
+scipy==1.10.0
+sentencepiece==0.1.96
+editdistance==0.6.0
+
+# fairseq dependencies used by the vendored AV-HuBERT repo
+cffi
+cython
+hydra-core<1.1
+omegaconf<2.1
+regex
+sacrebleu>=1.4.12
+
+# Install the vendored fairseq checked out in third_party/av_hubert
+-e ./third_party/av_hubert/fairseq

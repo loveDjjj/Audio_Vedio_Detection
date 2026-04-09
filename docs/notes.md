@@ -1,26 +1,24 @@
 # Notes
 
 ## 需求
-整理当前仓库文档体系，只保留 README.md、AGENTS.md、docs/notes.md、docs/logs/2026-04.md 四个项目文档文件。
+补充当前仓库所需的根目录 requirements.txt。
 
 ## 修改文件
-- README.md
-- AGENTS.md
+- requirements.txt
 - docs/notes.md
 - docs/logs/2026-04.md
-- Initial Plan.md（删除）
 
 ## 修改内容
-- 按当前真实目录、脚本、配置和输出路径重写 README，去掉阶段计划和过程性说明。
-- 新建 AGENTS.md、docs/notes.md、docs/logs/2026-04.md，并删除冗余的 Initial Plan.md。
+- 根据当前仓库真实代码、AV-HuBERT 上游 requirements 和 vendored fairseq 依赖，新增根目录 requirements.txt。
+- 更新最近一次修改摘要和月度日志，记录这次环境依赖文件补充。
 
 ## 验证
 ```bash
-git status --short -- README.md AGENTS.md docs Initial Plan.md
+Get-Content requirements.txt
 ```
 
 结果：通过
 
 ## Git
 - branch: `main`
-- commit: `git commit -m "docs: consolidate project documentation"`
+- commit: `git commit -m "build: add project requirements file"`
