@@ -1,0 +1,34 @@
+{
+  "dataset": "AV-Deepfake1M",
+  "source_split": "val",
+  "selection": [
+    "real.mp4",
+    "fake_video_fake_audio.mp4"
+  ],
+  "split_strategy": "random_video_level",
+  "seed": 42,
+  "source_stats": {
+    "total_metadata_rows": 57340,
+    "real_rows": 14235,
+    "fullfake_rows": 14515,
+    "missing_video_files": 0,
+    "selected_videos": 28750
+  },
+  "splits": {
+    "train": {
+      "videos": 23000,
+      "real_videos": 11408,
+      "fake_videos": 11592
+    },
+    "val": {
+      "videos": 2875,
+      "real_videos": 1437,
+      "fake_videos": 1438
+    },
+    "test": {
+      "videos": 2875,
+      "real_videos": 1390,
+      "fake_videos": 1485
+    }
+  }
+}

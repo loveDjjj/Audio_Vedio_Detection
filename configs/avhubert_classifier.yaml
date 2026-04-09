@@ -1,0 +1,60 @@
+experiment_name: av1m_val_real_fullfake_avhubert
+
+paths:
+  dataset_root: dataset/AV-Deepfake1M
+  raw_video_root: dataset/AV-Deepfake1M/val
+  split_dir: splits/av1m_val_real_fullfake
+  artifact_root: artifacts/avhubert/av1m_val_real_fullfake
+  manifest_dir: artifacts/avhubert/av1m_val_real_fullfake/manifests
+  landmark_dir: artifacts/avhubert/av1m_val_real_fullfake/landmarks
+  mouth_roi_root: artifacts/avhubert/av1m_val_real_fullfake/mouth_roi
+  output_root: outputs/avhubert/av1m_val_real_fullfake
+  checkpoint_path: model/self_large_vox_433h.pt
+  avhubert_repo: third_party/av_hubert
+  cnn_detector_path: resources/dlib/mmod_human_face_detector.dat
+  face_predictor_path: resources/dlib/shape_predictor_68_face_landmarks.dat
+  mean_face_path: resources/avhubert/20words_mean_face.npy
+
+preprocess:
+  manifest_names:
+    - train
+    - val
+    - test
+  nshard: 1
+  rank: 0
+  crop_width: 96
+  crop_height: 96
+  start_idx: 48
+  stop_idx: 68
+  window_margin: 12
+  fps: 25
+  save_landmarks: true
+  strict: true
+
+data:
+  max_frames: 500
+  pad_to_batch_max: true
+  image_crop_size: 88
+  image_mean: 0.421
+  image_std: 0.165
+  horizontal_flip_prob: 0.5
+  shuffle_train: true
+  drop_last_train: false
+
+model:
+  freeze_backbone: true
+  pooling: masked_mean
+  classifier_dropout: 0.1
+  hidden_dim: 0
+
+train:
+  seed: 42
+  device: cuda
+  epochs: 10
+  batch_size: 4
+  num_workers: 4
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  grad_clip_norm: 5.0
+  amp: true
+  log_interval: 20

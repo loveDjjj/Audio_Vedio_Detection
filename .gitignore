@@ -6,6 +6,15 @@
 /model/*
 !/model/.gitkeep
 !model/download_avhubert.py
+/resources/dlib/*
+!/resources/dlib/.gitkeep
+/resources/avhubert/*
+!/resources/avhubert/.gitkeep
+/artifacts/*
+!/artifacts/.gitkeep
+/outputs/*
+!/outputs/.gitkeep
+/third_party/
 
 # Python cache and tooling
 __pycache__/
