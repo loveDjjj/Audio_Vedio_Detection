@@ -1,0 +1,36 @@
+# Dataset payloads
+/dataset/AV-Deepfake1M/*
+!/dataset/AV-Deepfake1M/.gitkeep
+/dataset/FakeAVCeleb/*
+!/dataset/FakeAVCeleb/.gitkeep
+/model/*
+!/model/.gitkeep
+!model/download_avhubert.py
+
+# Python cache and tooling
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Virtual environments and secrets
+.venv/
+venv/
+env/
+.env
+.env.*
+
+# Editors and OS noise
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
