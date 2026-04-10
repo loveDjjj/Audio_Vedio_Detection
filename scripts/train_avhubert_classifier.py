@@ -11,7 +11,6 @@ from shutil import copy2
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
-from torch.cuda.amp import GradScaler
 from torch.nn import BCEWithLogitsLoss
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
@@ -115,7 +114,8 @@ def validate_cuda_devices(devices: list[int]) -> None:
 
 def configure_cuda_runtime(device: torch.device) -> dict[str, str | int]:
     torch.cuda.set_device(device)
-    torch.backends.cudnn.benchmark = True
+    # Use a conservative cudnn path because sequence lengths vary a lot batch-to-batch.
+    torch.backends.cudnn.benchmark = False
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
     torch.set_float32_matmul_precision("high")
@@ -272,7 +272,7 @@ def run_worker(local_rank: int, config_path: str, run_dir: str) -> None:
             weight_decay=train_cfg["weight_decay"],
         )
         criterion = BCEWithLogitsLoss()
-        scaler = GradScaler(enabled=train_cfg["amp"])
+        scaler = torch.amp.GradScaler("cuda", enabled=train_cfg["amp"])
 
         run_dir_path = Path(run_dir)
         best_path = run_dir_path / "best_head.pt"

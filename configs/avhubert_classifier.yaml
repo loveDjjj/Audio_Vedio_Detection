@@ -32,7 +32,7 @@ preprocess:
   strict: true
 
 data:
-  max_frames: 500
+  max_frames: 300
   pad_to_batch_max: true
   image_crop_size: 88
   image_mean: 0.421
@@ -54,10 +54,10 @@ train:
   master_port: 29501
   epochs: 10
   # Per-GPU batch size and per-process DataLoader workers.
-  batch_size: 4
-  num_workers: 4
+  batch_size: 2
+  num_workers: 2
   learning_rate: 0.001
   weight_decay: 0.0001
   grad_clip_norm: 5.0
-  amp: true
+  amp: false
   log_interval: 20

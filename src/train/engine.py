@@ -2,9 +2,19 @@ from __future__ import annotations
 
 import torch
 import torch.distributed as dist
-from torch.cuda.amp import autocast
+from torch import amp as torch_amp
 
 from src.train.metrics import compute_binary_metrics
+
+
+def format_batch_debug(batch: dict) -> dict:
+    return {
+        "audio_shape": tuple(batch["audio"].shape) if batch.get("audio") is not None else None,
+        "video_shape": tuple(batch["video"].shape) if batch.get("video") is not None else None,
+        "padding_mask_shape": tuple(batch["padding_mask"].shape) if batch.get("padding_mask") is not None else None,
+        "labels_shape": tuple(batch["labels"].shape) if batch.get("labels") is not None else None,
+        "relative_paths": list(batch.get("relative_paths", [])),
+    }
 
 
 def _is_distributed() -> bool:
@@ -66,9 +76,17 @@ def run_epoch(
         padding_mask = batch["padding_mask"].to(device, non_blocking=True)
         targets = batch["labels"].to(device, non_blocking=True)
 
-        with autocast(enabled=amp and device.type == "cuda"):
-            video_logits, _frame_logits = model(audio=audio, video=video, padding_mask=padding_mask)
-            loss = criterion(video_logits, targets)
+        try:
+            with torch_amp.autocast("cuda", enabled=amp and device.type == "cuda"):
+                video_logits, _frame_logits = model(audio=audio, video=video, padding_mask=padding_mask)
+                loss = criterion(video_logits, targets)
+        except RuntimeError:
+            debug = format_batch_debug(batch)
+            if device.type == "cuda":
+                debug["cuda_memory_allocated_mb"] = round(torch.cuda.memory_allocated(device) / (1024 ** 2), 2)
+                debug["cuda_memory_reserved_mb"] = round(torch.cuda.memory_reserved(device) / (1024 ** 2), 2)
+            print(f"[batch-debug] {debug}")
+            raise
 
         if is_train:
             optimizer.zero_grad(set_to_none=True)
