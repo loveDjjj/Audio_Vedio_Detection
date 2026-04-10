@@ -1,6 +1,7 @@
 # Recommended Python: 3.8
 # External tools still required outside pip:
 # - 7-Zip (for dataset/download_av1m_meta.py)
+# - ffmpeg (for extracting 16kHz mono audio from raw mp4 during AV-HuBERT training)
 # - AV-HuBERT assets under resources/
 
 # Core runtime

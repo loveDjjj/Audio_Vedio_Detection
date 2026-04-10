@@ -19,7 +19,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.data.av1m_mouth_roi_dataset import AV1MMouthRoiDataset
-from src.data.collate import collate_video_batch
+from src.data.collate import collate_audio_video_batch
+from src.models.avhubert_backbone import load_avhubert_checkpoint_metadata
 from src.models.binary_detector import AVHubertBinaryDetector
 from src.train.engine import run_epoch
 from src.utils.project import ensure_dir, load_config, resolve_path, seed_everything
@@ -36,11 +37,12 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def build_dataset(split_name: str, config: dict, training: bool):
+def build_dataset(split_name: str, config: dict, training: bool, backbone_metadata: dict):
     paths = config["paths"]
     data_cfg = config["data"]
     return AV1MMouthRoiDataset(
         csv_path=resolve_path(paths["split_dir"]) / f"{split_name}.csv",
+        raw_video_root=resolve_path(paths["raw_video_root"]),
         mouth_roi_root=resolve_path(paths["mouth_roi_root"]),
         avhubert_repo=resolve_path(paths["avhubert_repo"]),
         training=training,
@@ -48,12 +50,14 @@ def build_dataset(split_name: str, config: dict, training: bool):
         image_mean=data_cfg["image_mean"],
         image_std=data_cfg["image_std"],
         horizontal_flip_prob=data_cfg["horizontal_flip_prob"],
+        stack_order_audio=backbone_metadata["stack_order_audio"],
+        normalize_audio=backbone_metadata["audio_normalize"],
     )
 
 
 def make_loader(dataset, batch_size: int, num_workers: int, shuffle: bool, max_frames: int, pad_to_batch_max: bool, drop_last: bool):
     collate_fn = partial(
-        collate_video_batch,
+        collate_audio_video_batch,
         max_frames=max_frames,
         pad_to_batch_max=pad_to_batch_max,
     )
@@ -96,6 +100,11 @@ def main() -> int:
     data_cfg = config["data"]
     model_cfg = config["model"]
     paths = config["paths"]
+    checkpoint_path = resolve_path(paths["checkpoint_path"])
+    backbone_metadata = load_avhubert_checkpoint_metadata(checkpoint_path)
+
+    if not model_cfg["freeze_backbone"]:
+        raise ValueError("SSR-DFD AV-HuBERT baseline requires `model.freeze_backbone: true`.")
 
     device = resolve_device(train_cfg["device"])
     run_dir = ensure_dir(
@@ -103,9 +112,9 @@ def main() -> int:
     )
     copy2(resolve_path(args.config), run_dir / "config.yaml")
 
-    train_dataset = build_dataset("train", config, training=True)
-    val_dataset = build_dataset("val", config, training=False)
-    test_dataset = build_dataset("test", config, training=False)
+    train_dataset = build_dataset("train", config, training=True, backbone_metadata=backbone_metadata)
+    val_dataset = build_dataset("val", config, training=False, backbone_metadata=backbone_metadata)
+    test_dataset = build_dataset("test", config, training=False, backbone_metadata=backbone_metadata)
 
     train_loader = make_loader(
         dataset=train_dataset,
@@ -128,12 +137,10 @@ def main() -> int:
     test_loader = make_loader(test_dataset, **eval_loader_kwargs)
 
     model = AVHubertBinaryDetector(
-        checkpoint_path=resolve_path(paths["checkpoint_path"]),
+        checkpoint_path=checkpoint_path,
         avhubert_repo=resolve_path(paths["avhubert_repo"]),
         freeze_backbone=model_cfg["freeze_backbone"],
-        pooling=model_cfg["pooling"],
-        classifier_dropout=model_cfg["classifier_dropout"],
-        hidden_dim=model_cfg["hidden_dim"],
+        feat_dim=backbone_metadata["encoder_embed_dim"],
     ).to(device)
 
     trainable_parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
@@ -155,9 +162,17 @@ def main() -> int:
         "train_videos": len(train_dataset),
         "val_videos": len(val_dataset),
         "test_videos": len(test_dataset),
-        "train_missing_mouth_roi": train_dataset.missing_files,
-        "val_missing_mouth_roi": val_dataset.missing_files,
-        "test_missing_mouth_roi": test_dataset.missing_files,
+        "train_missing_files": train_dataset.missing_files,
+        "val_missing_files": val_dataset.missing_files,
+        "test_missing_files": test_dataset.missing_files,
+        "train_missing_mouth_roi": train_dataset.missing_mouth_roi_files,
+        "val_missing_mouth_roi": val_dataset.missing_mouth_roi_files,
+        "test_missing_mouth_roi": test_dataset.missing_mouth_roi_files,
+        "train_missing_raw_video": train_dataset.missing_raw_video_files,
+        "val_missing_raw_video": val_dataset.missing_raw_video_files,
+        "test_missing_raw_video": test_dataset.missing_raw_video_files,
+        "audio_stack_order": float(backbone_metadata["stack_order_audio"]),
+        "audio_normalize": float(backbone_metadata["audio_normalize"]),
     }
 
     for epoch in range(1, train_cfg["epochs"] + 1):

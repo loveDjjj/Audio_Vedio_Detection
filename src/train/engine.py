@@ -29,13 +29,18 @@ def run_epoch(
         if not batch:
             continue
 
-        video = batch["video"].to(device, non_blocking=True)
+        audio = batch["audio"]
+        if audio is not None:
+            audio = audio.to(device, non_blocking=True)
+        video = batch["video"]
+        if video is not None:
+            video = video.to(device, non_blocking=True)
         padding_mask = batch["padding_mask"].to(device, non_blocking=True)
         targets = batch["labels"].to(device, non_blocking=True)
 
         with autocast(enabled=amp and device.type == "cuda"):
-            logits = model(video=video, padding_mask=padding_mask)
-            loss = criterion(logits, targets)
+            video_logits, _frame_logits = model(audio=audio, video=video, padding_mask=padding_mask)
+            loss = criterion(video_logits, targets)
 
         if is_train:
             optimizer.zero_grad(set_to_none=True)
@@ -55,7 +60,7 @@ def run_epoch(
         batch_size = targets.shape[0]
         total_loss += float(loss.detach().item()) * batch_size
         total_examples += batch_size
-        all_logits.append(logits.detach().cpu())
+        all_logits.append(video_logits.detach().cpu())
         all_targets.append(targets.detach().cpu())
 
         if is_train and log_interval > 0 and step % log_interval == 0:

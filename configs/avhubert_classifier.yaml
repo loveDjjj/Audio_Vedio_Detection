@@ -42,10 +42,8 @@ data:
   drop_last_train: false
 
 model:
+  # SSR-DFD baseline: frozen AV-HuBERT backbone + shared Linear(1024, 1) probe.
   freeze_backbone: true
-  pooling: masked_mean
-  classifier_dropout: 0.1
-  hidden_dim: 0
 
 train:
   seed: 42
