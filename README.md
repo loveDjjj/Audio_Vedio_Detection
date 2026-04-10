@@ -62,6 +62,7 @@ python scripts/train_avhubert_classifier.py
 - 权重文件：`model/self_large_vox_433h.pt`
 - 第三方仓库：`third_party/av_hubert`
 - 外部工具：`ffmpeg`
+- 训练设备：可用的 NVIDIA GPU（当前训练入口要求 `CUDA`，不再回退到 CPU）
 - 预处理资源：`resources/dlib/shape_predictor_68_face_landmarks.dat`、`resources/dlib/mmod_human_face_detector.dat`、`resources/avhubert/20words_mean_face.npy`
 
 环境安装命令仓库内未完全固定，具体 conda 环境名待确认。
@@ -74,7 +75,7 @@ python scripts/train_avhubert_classifier.py
 - `preprocess`：manifest 名称、分片参数、mouth ROI 裁剪参数
 - `data`：帧数上限、裁剪尺寸、图像归一化和 batch 处理方式
 - `model`：当前只保留是否冻结 backbone；分类头固定为单层线性 probe
-- `train`：设备、epoch、batch size、学习率、AMP 等训练参数
+- `train`：GPU 设备、epoch、batch size、学习率、AMP 等训练参数
 
 ## 输出说明
 

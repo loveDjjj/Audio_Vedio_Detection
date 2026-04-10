@@ -1,53 +1,36 @@
 # Notes
 
 ## 需求
-按 SSR-DFD baseline 思路改造当前训练链：使用 frozen AV-HuBERT audio-visual backbone、单层线性 probe、frame logits + `logsumexp` 视频级聚合。
+将当前训练入口改成 GPU-only，显式使用 CUDA 设备运行，不再静默回退到 CPU。
 
 ## 修改文件
 - README.md
 - configs/avhubert_classifier.yaml
-- requirements.txt
-- src/data/av1m_mouth_roi_dataset.py
-- src/data/collate.py
-- src/models/avhubert_backbone.py
-- src/models/binary_detector.py
-- src/train/engine.py
 - scripts/train_avhubert_classifier.py
-- src/utils/avhubert_env.py
-- tests/test_avhubert_checkpoint.py
-- tests/test_binary_detector.py
-- tests/test_collate.py
-- tests/test_avhubert_env.py
+- tests/test_train_runtime.py
 - docs/notes.md
 - docs/logs/2026-04.md
 
 ## 修改内容
-- 将当前 video-only `AV-HuBERT` 训练链改成 audio+video 版本：dataset 从 raw mp4 提取 16kHz mono 音频并计算 logfbank，同时读取 mouth ROI 视频。
-- 新增 audio+video batch collate，统一对齐时序长度后输出 `audio: [B, F, T]`、`video: [B, C, T, H, W]` 和共享 `padding_mask`。
-- 重写 backbone loader，直接从 checkpoint 的 backbone 配置和 state dict 构造 `AVHubertModel`，避免 seq2seq wrapper 对上游 label dictionary 路径的依赖。
-- 将 detector 改成 SSR-DFD 风格 linear probe：对 `[B, T, 1024]` 时序特征做共享 `Linear(1024, 1)`，保留 `frame_logits`，并对有效时间步做 `logsumexp` 得到视频级 logit。
-- 更新训练脚本和 engine，只优化线性层参数，并从 checkpoint 元数据读取 `stack_order_audio` 和音频归一化设置。
-- 更新 README、requirements 注释和主配置说明，使仓库描述与新的 audio-visual baseline 保持一致。
-- 新增 `unittest` 回归用例，覆盖 checkpoint 元数据解析、linear probe `logsumexp` 聚合逻辑和 audio+video collate 结果。
+- 训练脚本改成 GPU-only：`train.device` 必须是 CUDA 设备；当 CUDA 不可用时直接报错，而不是回退到 CPU。
+- 默认设备改成 `cuda:0`，并在训练开始时显式打印正在使用的 GPU 名称和设备号。
+- 启用 CUDA 运行时优化：`torch.cuda.set_device(...)`、`cudnn.benchmark=True`、TF32、`float32_matmul_precision=high`。
+- DataLoader 的 `pin_memory` 和 `pin_memory_device` 跟随 CUDA 启用，减少 Host 到 GPU 的拷贝开销。
+- 新增 `unittest` 回归用例，覆盖 CUDA 设备解析和 GPU-only 约束。
 
 ## 验证
 ```bash
+PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_train_runtime.py'
 PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_*.py'
 PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python - <<'PY'
-from pathlib import Path
-from src.models.binary_detector import AVHubertBinaryDetector
-model = AVHubertBinaryDetector(
-    checkpoint_path=Path('model/self_large_vox_433h.pt'),
-    avhubert_repo=Path('third_party/av_hubert'),
-    freeze_backbone=True,
-    feat_dim=1024,
-)
-print(type(model.backbone.model).__name__, model.backbone.output_dim, model.backbone.metadata['stack_order_audio'])
+from scripts.train_avhubert_classifier import resolve_device, configure_cuda_runtime
+device = resolve_device("cuda:0")
+print(configure_cuda_runtime(device))
 PY
 ```
 
-结果：通过；`unittest` 5 条用例通过，smoke check 可实例化 frozen AV-HuBERT linear probe，输出维度为 `1024`，音频 `stack_order_audio` 为 `4`。
+结果：通过；`test_train_runtime.py` 4 条用例通过，全部 `unittest` 共 9 条通过，实际环境可解析到 `cuda:0` 并识别 `NVIDIA GeForce RTX 4090`。
 
 ## Git
 - branch: `main`
-- commit: 待确认
+- commit: `git commit -m "fix: enforce gpu-only avhubert training"`

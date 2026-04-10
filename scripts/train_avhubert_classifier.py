@@ -56,28 +56,50 @@ def build_dataset(split_name: str, config: dict, training: bool, backbone_metada
 
 
 def make_loader(dataset, batch_size: int, num_workers: int, shuffle: bool, max_frames: int, pad_to_batch_max: bool, drop_last: bool):
+    pin_memory = torch.cuda.is_available()
     collate_fn = partial(
         collate_audio_video_batch,
         max_frames=max_frames,
         pad_to_batch_max=pad_to_batch_max,
     )
-    return DataLoader(
-        dataset,
+    loader_kwargs = dict(
+        dataset=dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=pin_memory,
         drop_last=drop_last,
         persistent_workers=num_workers > 0,
         collate_fn=collate_fn,
     )
+    if pin_memory:
+        loader_kwargs["pin_memory_device"] = "cuda"
+    return DataLoader(
+        **loader_kwargs,
+    )
 
 
 def resolve_device(device_name: str) -> torch.device:
-    if device_name == "cuda" and not torch.cuda.is_available():
-        print("CUDA requested but unavailable. Falling back to CPU.")
-        return torch.device("cpu")
+    if not device_name.startswith("cuda"):
+        raise ValueError("This training entrypoint is GPU-only. Set `train.device` to a CUDA device such as `cuda:0`.")
+    if not torch.cuda.is_available():
+        raise RuntimeError("CUDA is required for this training entrypoint, but `torch.cuda.is_available()` is false.")
+    if device_name == "cuda":
+        return torch.device("cuda:0")
     return torch.device(device_name)
+
+
+def configure_cuda_runtime(device: torch.device) -> dict[str, str | int]:
+    torch.cuda.set_device(device)
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+    torch.set_float32_matmul_precision("high")
+    return {
+        "device": str(device),
+        "gpu_name": torch.cuda.get_device_name(device),
+        "gpu_index": int(device.index or 0),
+    }
 
 
 def save_head_checkpoint(path: Path, epoch: int, model: AVHubertBinaryDetector, metrics: dict, config: dict) -> None:
@@ -107,6 +129,8 @@ def main() -> int:
         raise ValueError("SSR-DFD AV-HuBERT baseline requires `model.freeze_backbone: true`.")
 
     device = resolve_device(train_cfg["device"])
+    gpu_info = configure_cuda_runtime(device)
+    print(f"Using GPU {gpu_info['gpu_index']}: {gpu_info['gpu_name']} ({gpu_info['device']})")
     run_dir = ensure_dir(
         resolve_path(paths["output_root"]) / datetime.now().strftime("%Y%m%d-%H%M%S")
     )
@@ -150,7 +174,7 @@ def main() -> int:
         weight_decay=train_cfg["weight_decay"],
     )
     criterion = BCEWithLogitsLoss()
-    scaler = GradScaler(enabled=train_cfg["amp"] and device.type == "cuda")
+    scaler = GradScaler(enabled=train_cfg["amp"])
 
     history: list[dict] = []
     best_epoch = -1
@@ -235,6 +259,7 @@ def main() -> int:
 
     summary = {
         "dataset": dataset_summary,
+        "gpu": gpu_info,
         "backbone_load_info": model.backbone.load_info,
         "best_epoch": best_epoch,
         "best_val_f1": best_val_f1,
