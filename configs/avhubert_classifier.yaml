@@ -61,3 +61,10 @@ train:
   grad_clip_norm: 5.0
   amp: false
   log_interval: 20
+
+logging:
+  level: INFO
+  train_log_filename: train.log
+  rank_log_filename_template: train_rank{rank}.log
+  show_progress: true
+  show_rank_logs: false

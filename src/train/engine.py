@@ -3,6 +3,7 @@ from __future__ import annotations
 import torch
 import torch.distributed as dist
 from torch import amp as torch_amp
+from tqdm import tqdm
 
 from src.train.metrics import compute_binary_metrics
 
@@ -54,6 +55,10 @@ def run_epoch(
     grad_clip_norm: float = 0.0,
     amp: bool = False,
     log_interval: int = 20,
+    phase: str = "train",
+    epoch: int | None = None,
+    logger=None,
+    show_progress: bool = False,
 ) -> dict[str, float] | None:
     is_train = optimizer is not None
     model.train(is_train)
@@ -63,7 +68,14 @@ def run_epoch(
     all_logits: list[torch.Tensor] = []
     all_targets: list[torch.Tensor] = []
 
-    for step, batch in enumerate(loader, start=1):
+    iterator = loader
+    progress_bar = None
+    if show_progress and _is_main_process():
+        desc = phase if epoch is None else f"{phase} e{epoch}"
+        progress_bar = tqdm(loader, desc=desc, leave=False)
+        iterator = progress_bar
+
+    for step, batch in enumerate(iterator, start=1):
         if not batch:
             continue
 
@@ -85,7 +97,10 @@ def run_epoch(
             if device.type == "cuda":
                 debug["cuda_memory_allocated_mb"] = round(torch.cuda.memory_allocated(device) / (1024 ** 2), 2)
                 debug["cuda_memory_reserved_mb"] = round(torch.cuda.memory_reserved(device) / (1024 ** 2), 2)
-            print(f"[batch-debug] {debug}")
+            if logger is not None:
+                logger.error("[batch-debug] %s", debug)
+            else:
+                print(f"[batch-debug] {debug}")
             raise
 
         if is_train:
@@ -110,7 +125,15 @@ def run_epoch(
         all_targets.append(targets.detach().cpu())
 
         if is_train and log_interval > 0 and step % log_interval == 0 and _is_main_process():
-            print(f"[train] step={step} loss={loss.detach().item():.4f}")
+            if progress_bar is not None:
+                progress_bar.set_postfix(loss=f"{loss.detach().item():.4f}")
+            if logger is not None:
+                logger.info("[%s] step=%s loss=%.4f", phase, step, loss.detach().item())
+            else:
+                print(f"[{phase}] step={step} loss={loss.detach().item():.4f}")
+
+    if progress_bar is not None:
+        progress_bar.close()
 
     if total_examples == 0 and not _is_distributed():
         return {"loss": 0.0, "accuracy": 0.0, "precision": 0.0, "recall": 0.0, "f1": 0.0}

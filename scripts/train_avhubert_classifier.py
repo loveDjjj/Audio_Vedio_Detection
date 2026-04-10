@@ -33,6 +33,7 @@ from src.train.runtime import (
     resolve_training_devices,
     unwrap_model,
 )
+from src.utils.logging_utils import build_logger
 from src.utils.project import ensure_dir, load_config, resolve_path, seed_everything
 
 
@@ -177,20 +178,33 @@ def run_worker(local_rank: int, config_path: str, run_dir: str) -> None:
     data_cfg = config["data"]
     model_cfg = config["model"]
     paths = config["paths"]
+    logging_cfg = config["logging"]
 
     distributed_cfg = build_distributed_config(train_cfg=train_cfg, local_rank=local_rank)
     device = resolve_device(f"cuda:{distributed_cfg.device_index}")
     setup_process_group(distributed_cfg)
 
     try:
+        run_dir_path = Path(run_dir)
+        logger = build_logger(
+            name=f"train.rank{distributed_cfg.rank}",
+            level=logging_cfg["level"],
+            log_file=run_dir_path
+            / (
+                logging_cfg["train_log_filename"]
+                if is_main_process(distributed_cfg.rank)
+                else logging_cfg["rank_log_filename_template"].format(rank=distributed_cfg.rank)
+            ),
+            console=is_main_process(distributed_cfg.rank) or bool(logging_cfg.get("show_rank_logs", False)),
+        )
         gpu_info = configure_cuda_runtime(device)
         if is_main_process(distributed_cfg.rank):
             if distributed_enabled(distributed_cfg.devices):
-                print(
+                logger.info(
                     f"Launching DDP on devices {distributed_cfg.devices} "
                     f"(world_size={distributed_cfg.world_size}, backend={distributed_cfg.backend})"
                 )
-            print(f"Using GPU {gpu_info['gpu_index']}: {gpu_info['gpu_name']} ({gpu_info['device']})")
+            logger.info("Using GPU %s: %s (%s)", gpu_info["gpu_index"], gpu_info["gpu_name"], gpu_info["device"])
 
         seed_everything(train_cfg["seed"] + distributed_cfg.rank)
 
@@ -274,7 +288,6 @@ def run_worker(local_rank: int, config_path: str, run_dir: str) -> None:
         criterion = BCEWithLogitsLoss()
         scaler = torch.amp.GradScaler("cuda", enabled=train_cfg["amp"])
 
-        run_dir_path = Path(run_dir)
         best_path = run_dir_path / "best_head.pt"
         last_path = run_dir_path / "last_head.pt"
         history: list[dict] = []
@@ -297,13 +310,14 @@ def run_worker(local_rank: int, config_path: str, run_dir: str) -> None:
             "audio_stack_order": float(backbone_metadata["stack_order_audio"]),
             "audio_normalize": float(backbone_metadata["audio_normalize"]),
         }
+        logger.info("Dataset summary: %s", dataset_summary)
 
         for epoch in range(1, train_cfg["epochs"] + 1):
             if train_sampler is not None:
                 train_sampler.set_epoch(epoch)
 
             if is_main_process(distributed_cfg.rank):
-                print(f"Epoch {epoch}/{train_cfg['epochs']}")
+                logger.info("Epoch %s/%s", epoch, train_cfg["epochs"])
 
             train_metrics = run_epoch(
                 model=model,
@@ -315,6 +329,10 @@ def run_worker(local_rank: int, config_path: str, run_dir: str) -> None:
                 grad_clip_norm=train_cfg["grad_clip_norm"],
                 amp=train_cfg["amp"],
                 log_interval=train_cfg["log_interval"],
+                phase="train",
+                epoch=epoch,
+                logger=logger,
+                show_progress=bool(logging_cfg.get("show_progress", True)),
             )
 
             with torch.no_grad():
@@ -328,6 +346,10 @@ def run_worker(local_rank: int, config_path: str, run_dir: str) -> None:
                     grad_clip_norm=0.0,
                     amp=train_cfg["amp"],
                     log_interval=0,
+                    phase="val",
+                    epoch=epoch,
+                    logger=logger,
+                    show_progress=bool(logging_cfg.get("show_progress", True)),
                 )
 
             if is_main_process(distributed_cfg.rank):
@@ -337,7 +359,7 @@ def run_worker(local_rank: int, config_path: str, run_dir: str) -> None:
                     "val": val_metrics,
                 }
                 history.append(record)
-                print(json.dumps(record, indent=2, ensure_ascii=False))
+                logger.info("Epoch metrics: %s", json.dumps(record, ensure_ascii=False))
 
                 save_head_checkpoint(last_path, epoch=epoch, model=model, metrics=val_metrics, config=config)
                 if val_metrics["f1"] > best_val_f1:
@@ -358,6 +380,10 @@ def run_worker(local_rank: int, config_path: str, run_dir: str) -> None:
                 grad_clip_norm=0.0,
                 amp=train_cfg["amp"],
                 log_interval=0,
+                phase="test",
+                epoch=None,
+                logger=logger,
+                show_progress=bool(logging_cfg.get("show_progress", True)),
             )
 
         if is_main_process(distributed_cfg.rank):
@@ -378,7 +404,7 @@ def run_worker(local_rank: int, config_path: str, run_dir: str) -> None:
             }
             with (run_dir_path / "summary.json").open("w", encoding="utf-8") as handle:
                 json.dump(summary, handle, indent=2, ensure_ascii=False)
-            print(json.dumps(summary, indent=2, ensure_ascii=False))
+            logger.info("Training summary: %s", json.dumps(summary, ensure_ascii=False))
     finally:
         cleanup_process_group()
 

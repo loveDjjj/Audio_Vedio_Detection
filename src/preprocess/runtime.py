@@ -11,6 +11,7 @@ from typing import Any
 from tqdm import tqdm
 
 from src.preprocess.manifest_builder import build_manifests
+from src.utils.logging_utils import build_logger
 from src.utils.project import ensure_dir, load_config, resolve_path
 
 
@@ -136,9 +137,23 @@ def _run_preprocess_shard(
     config = load_config(Path(config_path))
     paths = config["paths"]
     preprocess_cfg = config["preprocess"]
+    logging_cfg = config["logging"]
 
     manifest_path = resolve_path(paths["manifest_dir"]) / f"{preprocess_cfg['manifest_name']}.list"
     artifact_root = ensure_dir(paths["artifact_root"])
+    logger = build_logger(
+        name=f"preprocess.rank{rank}",
+        level=logging_cfg["level"],
+        log_file=artifact_root / logging_cfg["worker_log_filename_template"].format(rank=rank),
+        console=False,
+    )
+    logger.info(
+        "Starting shard rank=%s/%s on cuda:%s with cpu_threads_per_worker=%s",
+        rank,
+        nshard,
+        device_index,
+        cpu_threads_per_worker,
+    )
 
     summary = process_manifest(
         raw_video_root=resolve_path(paths["raw_video_root"]),
@@ -173,6 +188,7 @@ def _run_preprocess_shard(
         encoding="utf-8",
     )
     summary["device_index"] = device_index
+    logger.info("Completed shard summary: %s", json.dumps(summary, ensure_ascii=False))
     return summary
 
 
@@ -180,6 +196,13 @@ def run_preprocess_from_config(config_path: Path = DEFAULT_PREPROCESS_CONFIG_PAT
     config = load_config(config_path)
     runtime_cfg, manifest_path = _resolve_runtime(config)
     artifact_root = ensure_dir(config["paths"]["artifact_root"])
+    logging_cfg = config["logging"]
+    logger = build_logger(
+        name="preprocess.main",
+        level=logging_cfg["level"],
+        log_file=artifact_root / logging_cfg["main_log_filename"],
+        console=True,
+    )
 
     devices = [int(device) for device in runtime_cfg["devices"]]
     workers_per_device = int(runtime_cfg["workers_per_device"])
@@ -187,6 +210,15 @@ def run_preprocess_from_config(config_path: Path = DEFAULT_PREPROCESS_CONFIG_PAT
     show_main_progress = bool(runtime_cfg.get("show_main_progress", True))
     _validate_devices(devices)
     assignments = build_worker_assignments(devices=devices, workers_per_device=workers_per_device)
+    logger.info(
+        "Preprocess config=%s manifest=%s devices=%s workers_per_device=%s cpu_threads_per_worker=%s",
+        resolve_path(config_path),
+        manifest_path,
+        devices,
+        workers_per_device,
+        cpu_threads_per_worker,
+    )
+    logger.info("Worker assignments: %s", assignments)
 
     total_files = len(
         [
@@ -278,4 +310,5 @@ def run_preprocess_from_config(config_path: Path = DEFAULT_PREPROCESS_CONFIG_PAT
     combined_summary["num_procs"] = len(assignments)
     combined_summary["cpu_threads_per_worker"] = cpu_threads_per_worker
     combined_summary["start_method"] = runtime_cfg.get("start_method", "spawn")
+    logger.info("Preprocess summary: %s", json.dumps(combined_summary, ensure_ascii=False))
     return combined_summary

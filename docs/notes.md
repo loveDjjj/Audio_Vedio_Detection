@@ -1,55 +1,35 @@
 # Notes
 
 ## 需求
-修复当前单卡训练在 epoch 内部触发的 CUDA launch failure，并将默认训练配置调成更稳的保守值。
+为当前预处理和训练链路增加进度条显示与日志系统。
 
 ## 修改文件
-- src/data/av1m_mouth_roi_dataset.py
 - configs/avhubert_classifier.yaml
+- configs/avhubert_preprocess.yaml
 - scripts/train_avhubert_classifier.py
+- src/preprocess/runtime.py
 - src/train/engine.py
-- tests/test_train_engine.py
-- tests/test_avhubert_dataset_import.py
+- src/utils/logging_utils.py
+- tests/test_logging_utils.py
 - docs/notes.md
 - docs/logs/2026-04.md
 
 ## 修改内容
-- 保留 `avhubert.utils` 显式子模块导入修复，并保留 `s16le` PCM 音频读取，确保 dataset 初始化和单样本读取稳定。
-- 在 `src/train/engine.py` 中新增 batch 调试输出；一旦前向或 loss 计算阶段再次报 `RuntimeError`，会打印当前 batch 的 audio/video shape、relative_paths 和 CUDA 显存占用。
-- 将训练默认配置调成更保守的单卡启动值：`data.max_frames=300`、`train.batch_size=2`、`train.num_workers=2`、`train.amp=false`。
-- 关闭 `cudnn.benchmark`，避免变长序列 batch 频繁切换卷积算法时引入不稳定。
-- 新增 `test_train_engine.py`，覆盖 batch 调试信息的格式化逻辑。
+- 新增公共日志工具 `src/utils/logging_utils.py`，统一终端输出和文件日志格式，并使用 `tqdm.write` 避免破坏进度条。
+- 训练配置新增 `logging` 区域；主进程将日志写到 `train.log`，其它 rank 写到 `train_rank{rank}.log`。
+- 预处理配置新增 `logging` 区域；主进程将日志写到 `preprocess.log`，worker 写到 `preprocess_rank{rank}.log`。
+- 训练 `run_epoch` 现在支持 phase 级进度条，主进程会显示 `train/val/test` 进度并定期记录 loss。
+- 预处理 runtime 现在会把 worker 分配、配置摘要和最终 summary 写入日志文件，同时保留主进程总进度条。
+- 新增 `test_logging_utils.py`，覆盖日志文件写盘能力。
 
 ## 验证
 ```bash
-PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_train_engine.py'
-PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_avhubert_dataset_import.py'
+PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_logging_utils.py'
 PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_*.py'
-PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python - <<'PY'
-from pathlib import Path
-from src.data.av1m_mouth_roi_dataset import AV1MMouthRoiDataset
-from src.models.avhubert_backbone import load_avhubert_checkpoint_metadata
-metadata = load_avhubert_checkpoint_metadata(Path('model/self_large_vox_433h.pt'))
-dataset = AV1MMouthRoiDataset(
-    csv_path=Path('splits/av1m_val_real_fullfake/train.csv'),
-    raw_video_root=Path('dataset/AV-Deepfake1M/val'),
-    mouth_roi_root=Path('artifacts/avhubert/av1m_val_real_fullfake/mouth_roi'),
-    avhubert_repo=Path('third_party/av_hubert'),
-    training=True,
-    image_crop_size=88,
-    image_mean=0.421,
-    image_std=0.165,
-    horizontal_flip_prob=0.5,
-    stack_order_audio=metadata['stack_order_audio'],
-    normalize_audio=metadata['audio_normalize'],
-)
-sample = dataset[0]
-print(len(dataset), tuple(sample['audio'].shape), tuple(sample['video'].shape), sample['relative_path'])
-PY
 ```
 
-结果：通过；`test_train_engine.py` 1 条用例通过，`test_avhubert_dataset_import.py` 1 条用例通过，全部 `unittest` 共 22 条通过；dataset 可成功初始化并读取首个真实样本，输出 `audio=(383, 104)`、`video=(383, 88, 88, 1)`。
+结果：通过；`test_logging_utils.py` 1 条用例通过，全部 `unittest` 共 23 条通过。
 
 ## Git
 - branch: `main`
-- commit: `git commit -m "fix: stabilize avhubert single-gpu training"`
+- commit: `git commit -m "feat: add progress bars and logging"`

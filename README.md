@@ -89,7 +89,8 @@ python scripts/train_avhubert_classifier.py
 - `artifacts/avhubert/av1m_val_real_fullfake/manifests/`：`train.list`、`val.list`、`test.list`、`all.list`
 - `artifacts/avhubert/av1m_val_real_fullfake/landmarks/`：关键点检测结果
 - `artifacts/avhubert/av1m_val_real_fullfake/mouth_roi/`：裁剪后的嘴部 ROI 视频
-- `outputs/avhubert/av1m_val_real_fullfake/<timestamp>/`：训练输出目录，包含 `config.yaml`、`best_head.pt`、`last_head.pt`、`summary.json`
+- `artifacts/avhubert/av1m_val_real_fullfake/preprocess.log`：预处理主进程日志；worker 日志会写成 `preprocess_rank*.log`
+- `outputs/avhubert/av1m_val_real_fullfake/<timestamp>/`：训练输出目录，包含 `config.yaml`、`train.log`、`best_head.pt`、`last_head.pt`、`summary.json`；多卡时其它 rank 会写 `train_rank*.log`
 
 ## 阅读顺序
 

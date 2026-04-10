@@ -33,3 +33,8 @@ runtime:
   start_method: spawn
   show_main_progress: true
   show_worker_logs: false
+
+logging:
+  level: INFO
+  main_log_filename: preprocess.log
+  worker_log_filename_template: preprocess_rank{rank}.log
