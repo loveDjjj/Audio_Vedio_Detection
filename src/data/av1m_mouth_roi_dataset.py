@@ -114,7 +114,11 @@ class AV1MMouthRoiDataset(Dataset):
             )
 
         audio_features = np.load(audio_feature_path).astype(np.float32)
-        audio_features = stack_audio_features(audio_features, self.stack_order_audio)
+        if audio_features.ndim != 2:
+            raise ValueError(f"Expected 2D cached audio features, got shape={audio_features.shape} from {audio_feature_path}")
+        # Backward compatibility: older cache files stored raw 26-dim features.
+        if audio_features.shape[1] != self.stack_order_audio * 26:
+            audio_features = stack_audio_features(audio_features, self.stack_order_audio)
         audio = torch.from_numpy(audio_features.astype(np.float32))
         if self.normalize_audio:
             with torch.no_grad():

@@ -43,7 +43,7 @@ outputs/
 - [dataset/download_av1m_meta.py](dataset/download_av1m_meta.py)：下载 `AV-Deepfake1M` 的 `val` 分卷和 `val_metadata.json`，并调用 `7z` 解压。
 - [dataset/build_av1m_val_real_fullfake_splits.py](dataset/build_av1m_val_real_fullfake_splits.py)：从 `val_metadata.json` 中筛出 `real.mp4` 和 `fake_video_fake_audio.mp4`，随机生成 `train/val/test` 列表。
 - [scripts/build_avhubert_manifests.py](scripts/build_avhubert_manifests.py)：把 split CSV 转成 AV-HuBERT 预处理用的 `*.list`。
-- [scripts/cache_av1m_audio_features.py](scripts/cache_av1m_audio_features.py)：离线提取 raw mp4 的 16kHz mono 音频 logfbank，并缓存为训练可直接读取的 `.npy` 特征文件。
+- [scripts/cache_av1m_audio_features.py](scripts/cache_av1m_audio_features.py)：按多进程方式离线提取 raw mp4 的 16kHz mono 音频 logfbank，并直接缓存为训练最终读取的 stacked `.npy` 特征文件。
 - [scripts/preprocess_av1m_mouth_roi.py](scripts/preprocess_av1m_mouth_roi.py)：读取独立预处理 YAML，使用 dlib CUDA CNN face detector 做多进程、多卡分片 mouth ROI 预处理，并由主进程汇总进度和结果。
 - [scripts/train_avhubert_classifier.py](scripts/train_avhubert_classifier.py)：读取训练 YAML，按 `train.devices` 自动切换单卡或多卡 DDP，加载 frozen `AV-HuBERT` audio-visual backbone 和单层线性 probe，执行训练、验证和测试。
 
@@ -82,6 +82,7 @@ python scripts/train_avhubert_classifier.py
   - `runtime`：设备列表、每卡 worker 数、每 worker CPU 线程数、主进程进度条和多进程启动方式
 - [configs/avhubert_classifier.yaml](configs/avhubert_classifier.yaml)
   - `paths`：训练数据、checkpoint、第三方仓库与输出路径
+  - `audio_cache`：音频缓存脚本的进程数、每 worker CPU 线程数和 stack 参数
   - `data`：帧数上限、裁剪尺寸、图像归一化和 batch 处理方式
   - `model`：当前只保留是否冻结 backbone；分类头固定为单层线性 probe
   - `train`：DDP 设备列表、后端、master 地址端口，以及每 GPU 的 batch size / worker 数和训练参数
