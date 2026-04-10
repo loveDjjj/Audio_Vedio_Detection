@@ -4,19 +4,19 @@
 # - AV-HuBERT assets under resources/
 
 # Core runtime
-numpy<2
+numpy<1.24
 PyYAML
 tqdm
 requests
 huggingface_hub
 
 # Training
-torch 
+torch
 
 # AV-HuBERT / preprocessing
-opencv-python==4.5.4.60
+opencv-python-headless==4.5.4.60
 scikit-image==0.17.2
-dlib==19.22.1
+dlib==19.24.6
 python-speech-features==0.6
 scipy==1.10.0
 sentencepiece==0.1.96

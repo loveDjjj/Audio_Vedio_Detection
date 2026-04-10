@@ -7,6 +7,7 @@ from pathlib import Path
 def bootstrap_avhubert_repo(repo_root: str | Path) -> Path:
     repo_path = Path(repo_root).resolve()
     fairseq_path = repo_path / "fairseq"
+    avhubert_path = repo_path / "avhubert"
 
     if not repo_path.exists():
         raise FileNotFoundError(
@@ -19,7 +20,13 @@ def bootstrap_avhubert_repo(repo_root: str | Path) -> Path:
             "Run `git submodule update --init --recursive` inside third_party/av_hubert."
         )
 
-    for path in (fairseq_path, repo_path):
+    # Upstream AV-HuBERT switches to a top-level "debug" import path when argv has
+    # only the script name, which breaks our normal package imports.
+    if len(sys.argv) == 1:
+        sys.argv.append("--avhubert-import")
+
+    # AV-HuBERT uses both package-relative and top-level imports depending on argv shape.
+    for path in (fairseq_path, avhubert_path, repo_path):
         path_str = str(path)
         if path_str not in sys.path:
             sys.path.insert(0, path_str)
