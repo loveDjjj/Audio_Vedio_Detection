@@ -266,6 +266,7 @@ def process_manifest(
     stage: str = "all",
     save_landmarks: bool = True,
     strict: bool = True,
+    show_progress: bool = True,
 ) -> dict:
     if stage not in {"all", "detect", "align"}:
         raise ValueError(f"Unsupported stage: {stage}")
@@ -300,7 +301,7 @@ def process_manifest(
         "failed_files": [],
     }
 
-    for file_id in tqdm(file_ids, desc=f"{stage}:{manifest_path.stem}"):
+    for file_id in tqdm(file_ids, desc=f"{stage}:{manifest_path.stem}:r{rank}", disable=not show_progress):
         raw_video_path = raw_video_root / f"{file_id}.mp4"
         landmark_path = landmark_root / f"{file_id}.pkl"
         mouth_roi_path = mouth_roi_root / f"{file_id}.mp4"
