@@ -1,43 +1,49 @@
 # Notes
 
 ## 需求
-将当前训练代码改成由 YAML 控制的单卡/多卡 DDP 版本，并检查当前逻辑是否可运行。
+修复训练阶段 `avhubert.utils` 被错误解析为 `fairseq.utils` 导致的数据集初始化失败，并检查当前训练逻辑是否至少能读取真实样本。
 
 ## 修改文件
-- README.md
-- configs/avhubert_classifier.yaml
-- scripts/train_avhubert_classifier.py
-- src/train/engine.py
-- src/train/runtime.py
-- tests/test_train_distributed_runtime.py
+- src/data/av1m_mouth_roi_dataset.py
+- tests/test_avhubert_dataset_import.py
 - docs/notes.md
 - docs/logs/2026-04.md
 
 ## 修改内容
-- 训练配置改成从 `train.devices` 读取单卡或多卡设备列表；当设备列表长度大于 1 时，训练入口自动使用单机 DDP。
-- `scripts/train_avhubert_classifier.py` 改成单机自拉起 worker 的多卡训练入口：主进程创建统一 `run_dir`，每个 worker 绑定自己的 GPU，自动初始化和清理 process group。
-- `src/train/engine.py` 增加跨 rank 的 logits / targets / loss 聚合逻辑，保证多卡训练下指标、验证和测试只在主进程汇总。
-- 新增 `src/train/runtime.py`，统一处理设备列表解析、rank 到 GPU 映射、主进程判定和 DDP 配置。
-- checkpoint、history、summary 和终端日志都只由 rank 0 负责写出。
-- 保持单卡模式可直接运行；默认配置仍是 `devices: [0]`，改成 `[0,1,...]` 即可切多卡。
+- 将 `src/data/av1m_mouth_roi_dataset.py` 中的 `avhubert.utils` 导入改成显式子模块导入，避免被 `avhubert.__init__` 的星号导出污染成 `fairseq.utils`。
+- 同时修正 transform 初始化仍引用旧局部变量名的问题。
+- 音频提取由 `ffmpeg -> wav pipe` 改成直接读取 `s16le` PCM，避免训练时反复出现 `WavFileWarning: Reached EOF prematurely`。
+- 新增最小回归测试，验证 `avhubert.utils` 子模块能够解析到真正的预处理变换实现。
 
 ## 验证
 ```bash
-PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_train_runtime.py'
-PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_train_distributed_runtime.py'
+PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_avhubert_dataset_import.py'
 PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_*.py'
 PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python - <<'PY'
-from src.train.runtime import build_distributed_config
-cfg = build_distributed_config(
-    {"devices": [0, 2], "backend": "nccl", "master_addr": "127.0.0.1", "master_port": 29501},
-    local_rank=1,
+from pathlib import Path
+from src.data.av1m_mouth_roi_dataset import AV1MMouthRoiDataset
+from src.models.avhubert_backbone import load_avhubert_checkpoint_metadata
+metadata = load_avhubert_checkpoint_metadata(Path('model/self_large_vox_433h.pt'))
+dataset = AV1MMouthRoiDataset(
+    csv_path=Path('splits/av1m_val_real_fullfake/train.csv'),
+    raw_video_root=Path('dataset/AV-Deepfake1M/val'),
+    mouth_roi_root=Path('artifacts/avhubert/av1m_val_real_fullfake/mouth_roi'),
+    avhubert_repo=Path('third_party/av_hubert'),
+    training=True,
+    image_crop_size=88,
+    image_mean=0.421,
+    image_std=0.165,
+    horizontal_flip_prob=0.5,
+    stack_order_audio=metadata['stack_order_audio'],
+    normalize_audio=metadata['audio_normalize'],
 )
-print(cfg)
+sample = dataset[0]
+print(len(dataset), tuple(sample['audio'].shape), tuple(sample['video'].shape), sample['relative_path'])
 PY
 ```
 
-结果：通过；`test_train_runtime.py` 4 条用例通过，`test_train_distributed_runtime.py` 5 条用例通过，全部 `unittest` 共 20 条通过；DDP 配置可正确将 `local_rank=1` 映射到设备 `2`。
+结果：通过；`test_avhubert_dataset_import.py` 1 条用例通过，全部 `unittest` 共 21 条通过；dataset 可成功初始化并读取首个真实样本，输出 `audio=(383, 104)`、`video=(383, 88, 88, 1)`。
 
 ## Git
 - branch: `main`
-- commit: `git commit -m "feat: add yaml-driven multi-gpu ddp training"`
+- commit: `git commit -m "fix: resolve avhubert dataset utils import"`

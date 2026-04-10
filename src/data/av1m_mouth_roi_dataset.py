@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import csv
-import io
+import importlib
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -11,7 +11,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from python_speech_features import logfbank
-from scipy.io import wavfile
 from torch.utils.data import Dataset
 
 from src.utils.avhubert_env import bootstrap_avhubert_repo
@@ -54,9 +53,10 @@ class AV1MMouthRoiDataset(Dataset):
     ) -> None:
         super().__init__()
         bootstrap_avhubert_repo(avhubert_repo)
-        from avhubert import utils as avhubert_utils  # type: ignore
 
-        self.avhubert_utils = avhubert_utils
+        # `from avhubert import utils` is shadowed by `fairseq.utils` via AV-HuBERT's
+        # wildcard imports, so import the preprocessing submodule explicitly.
+        self.avhubert_utils = importlib.import_module("avhubert.utils")
         self.csv_path = csv_path
         self.raw_video_root = raw_video_root
         self.mouth_roi_root = mouth_roi_root
@@ -93,15 +93,15 @@ class AV1MMouthRoiDataset(Dataset):
                 )
 
         transform_steps = [
-            avhubert_utils.Normalize(0.0, 255.0),
-            avhubert_utils.RandomCrop((image_crop_size, image_crop_size))
+            self.avhubert_utils.Normalize(0.0, 255.0),
+            self.avhubert_utils.RandomCrop((image_crop_size, image_crop_size))
             if training
-            else avhubert_utils.CenterCrop((image_crop_size, image_crop_size)),
+            else self.avhubert_utils.CenterCrop((image_crop_size, image_crop_size)),
         ]
         if training:
-            transform_steps.append(avhubert_utils.HorizontalFlip(horizontal_flip_prob))
-        transform_steps.append(avhubert_utils.Normalize(image_mean, image_std))
-        self.transform = avhubert_utils.Compose(transform_steps)
+            transform_steps.append(self.avhubert_utils.HorizontalFlip(horizontal_flip_prob))
+        transform_steps.append(self.avhubert_utils.Normalize(image_mean, image_std))
+        self.transform = self.avhubert_utils.Compose(transform_steps)
 
         if not self.records:
             raise ValueError(
@@ -130,7 +130,7 @@ class AV1MMouthRoiDataset(Dataset):
             "-ar",
             "16000",
             "-f",
-            "wav",
+            "s16le",
             "pipe:1",
         ]
         result = subprocess.run(
@@ -143,13 +143,11 @@ class AV1MMouthRoiDataset(Dataset):
             error = result.stderr.decode("utf-8", errors="ignore").strip()
             raise RuntimeError(f"ffmpeg failed for {raw_video_path}: {error}")
 
-        sample_rate, wav_data = wavfile.read(io.BytesIO(result.stdout))
-        if sample_rate != 16_000 or wav_data.ndim != 1:
-            raise ValueError(
-                f"Expected 16kHz mono audio from {raw_video_path}, got sample_rate={sample_rate}, shape={wav_data.shape}."
-            )
+        wav_data = np.frombuffer(result.stdout, dtype=np.int16)
+        if wav_data.ndim != 1 or wav_data.size == 0:
+            raise ValueError(f"Expected non-empty 16kHz mono PCM audio from {raw_video_path}.")
 
-        audio_features = logfbank(wav_data, samplerate=sample_rate).astype(np.float32)
+        audio_features = logfbank(wav_data, samplerate=16_000).astype(np.float32)
         audio_features = _stack_audio_features(audio_features, self.stack_order_audio)
         audio = torch.from_numpy(audio_features.astype(np.float32))
         if self.normalize_audio:
