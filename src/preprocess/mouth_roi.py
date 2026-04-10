@@ -267,6 +267,7 @@ def process_manifest(
     save_landmarks: bool = True,
     strict: bool = True,
     show_progress: bool = True,
+    progress_callback=None,
 ) -> dict:
     if stage not in {"all", "detect", "align"}:
         raise ValueError(f"Unsupported stage: {stage}")
@@ -309,21 +310,29 @@ def process_manifest(
         if not raw_video_path.exists():
             summary["failed_missing_video"] += 1
             summary["failed_files"].append({"file_id": file_id, "reason": "missing_video"})
+            if progress_callback is not None:
+                progress_callback(file_id)
             continue
 
         if stage == "detect":
             if landmark_path.exists():
                 summary["skipped_existing_landmarks"] += 1
+                if progress_callback is not None:
+                    progress_callback(file_id)
                 continue
             landmarks = detect_landmarks_for_video(raw_video_path, detector, cnn_detector, predictor)
             landmark_path.parent.mkdir(parents=True, exist_ok=True)
             with landmark_path.open("wb") as handle:
                 pickle.dump(landmarks, handle)
             summary["landmarks_written"] += 1
+            if progress_callback is not None:
+                progress_callback(file_id)
             continue
 
         if mouth_roi_path.exists():
             summary["skipped_existing_mouth_roi"] += 1
+            if progress_callback is not None:
+                progress_callback(file_id)
             continue
 
         if landmark_path.exists():
@@ -339,6 +348,8 @@ def process_manifest(
         else:
             summary["failed_missing_landmarks"] += 1
             summary["failed_files"].append({"file_id": file_id, "reason": "missing_landmark_file"})
+            if progress_callback is not None:
+                progress_callback(file_id)
             continue
 
         try:
@@ -348,6 +359,8 @@ def process_manifest(
         if interpolated_landmarks is None:
             summary["failed_no_landmarks"] += 1
             summary["failed_files"].append({"file_id": file_id, "reason": "no_landmarks"})
+            if progress_callback is not None:
+                progress_callback(file_id)
             continue
 
         try:
@@ -370,6 +383,10 @@ def process_manifest(
             summary["failed_crop"] += 1
             summary["failed_files"].append({"file_id": file_id, "reason": f"crop_failed:{exc}"})
             if not strict:
+                if progress_callback is not None:
+                    progress_callback(file_id)
                 continue
+        if progress_callback is not None:
+            progress_callback(file_id)
 
     return summary

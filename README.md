@@ -38,11 +38,11 @@ outputs/
 ## 关键文件说明
 
 - [configs/avhubert_classifier.yaml](configs/avhubert_classifier.yaml)：当前训练主配置，集中管理训练数据路径、模型和训练参数。
-- [configs/avhubert_preprocess.yaml](configs/avhubert_preprocess.yaml)：当前预处理配置，集中管理 mouth ROI 预处理路径、裁剪参数和多进程运行参数。
+- [configs/avhubert_preprocess.yaml](configs/avhubert_preprocess.yaml)：当前预处理配置，集中管理 mouth ROI 预处理路径、裁剪参数、多进程和多卡运行参数。
 - [dataset/download_av1m_meta.py](dataset/download_av1m_meta.py)：下载 `AV-Deepfake1M` 的 `val` 分卷和 `val_metadata.json`，并调用 `7z` 解压。
 - [dataset/build_av1m_val_real_fullfake_splits.py](dataset/build_av1m_val_real_fullfake_splits.py)：从 `val_metadata.json` 中筛出 `real.mp4` 和 `fake_video_fake_audio.mp4`，随机生成 `train/val/test` 列表。
 - [scripts/build_avhubert_manifests.py](scripts/build_avhubert_manifests.py)：把 split CSV 转成 AV-HuBERT 预处理用的 `*.list`。
-- [scripts/preprocess_av1m_mouth_roi.py](scripts/preprocess_av1m_mouth_roi.py)：读取独立预处理 YAML，使用 dlib CUDA CNN face detector 做多进程分片 mouth ROI 预处理，并把结果写到 `artifacts/`。
+- [scripts/preprocess_av1m_mouth_roi.py](scripts/preprocess_av1m_mouth_roi.py)：读取独立预处理 YAML，使用 dlib CUDA CNN face detector 做多进程、多卡分片 mouth ROI 预处理，并由主进程汇总进度和结果。
 - [scripts/train_avhubert_classifier.py](scripts/train_avhubert_classifier.py)：加载 frozen `AV-HuBERT` audio-visual backbone 和单层线性 probe，执行训练、验证和测试。
 
 ## 运行方法
@@ -76,7 +76,7 @@ python scripts/train_avhubert_classifier.py
 - [configs/avhubert_preprocess.yaml](configs/avhubert_preprocess.yaml)
   - `paths`：split、raw video、landmark、mouth ROI 和预处理资源路径
   - `preprocess`：manifest 选择、裁剪参数和 strict/save_landmarks
-  - `runtime`：多进程分片参数，默认 `2` 个进程、`spawn` 启动
+  - `runtime`：设备列表、每卡 worker 数、每 worker CPU 线程数、主进程进度条和多进程启动方式
 - [configs/avhubert_classifier.yaml](configs/avhubert_classifier.yaml)
   - `paths`：训练数据、checkpoint、第三方仓库与输出路径
   - `data`：帧数上限、裁剪尺寸、图像归一化和 batch 处理方式

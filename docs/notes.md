@@ -1,40 +1,37 @@
 # Notes
 
 ## 需求
-将 mouth ROI 预处理配置拆到独立 YAML，并改成默认 2 进程分片的多进程预处理，不再依赖终端参数传 stage / manifest / rank / nshard。
+将独立 YAML 预处理运行时扩展为主进程汇总进度、多卡设备分配版本。
 
 ## 修改文件
 - README.md
 - configs/avhubert_preprocess.yaml
-- scripts/preprocess_av1m_mouth_roi.py
 - src/preprocess/mouth_roi.py
 - src/preprocess/runtime.py
 - tests/test_preprocess_runtime.py
-- tests/test_mouth_roi.py
 - docs/notes.md
 - docs/logs/2026-04.md
 
 ## 修改内容
-- 新增独立预处理配置文件 `configs/avhubert_preprocess.yaml`，将路径、预处理参数和运行时参数从训练 YAML 中分离。
-- `scripts/preprocess_av1m_mouth_roi.py` 改成零业务参数入口，默认直接读取 `configs/avhubert_preprocess.yaml`。
-- 新增 `src/preprocess/runtime.py`，负责 manifest 构建、worker 分片规划、`spawn` 多进程调度、per-shard summary 写出和最终 summary 聚合。
-- 运行时默认使用 `2` 个进程分片，同一张 GPU 共享 CNN detector 阶段，避免直接把 4090 打爆；后续可在 YAML 内改为 `3` 或 `4`。
+- `src/preprocess/runtime.py` 扩展为多卡 runtime：根据 YAML 中的 `devices` 和 `workers_per_device` 为 worker 分配 GPU，并设置每个 worker 的 `CUDA_VISIBLE_DEVICES` 和 CPU 线程上限。
+- 主进程新增单个汇总进度条；worker 不再各自打印 `tqdm`，而是通过队列向主进程上报处理进度。
+- 默认值按 `8 x 4090 + 88 vCPU` 机器设置为：`devices=[0,1,2,3,4,5,6,7]`、`workers_per_device=2`、`cpu_threads_per_worker=4`，总计 `16` 个 worker。
 - 保留严格 CNN/GPU 检测约束：不回退 CPU HOG detector。
-- 新增 `unittest` 回归用例，覆盖 worker shard 规划、summary 聚合和 CNN/GPU 检测约束。
+- 新增 `unittest` 回归用例，覆盖多卡 worker 分配、线程环境变量和 summary 聚合。
 
 ## 验证
 ```bash
 PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_preprocess_runtime.py'
-PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_mouth_roi.py'
 PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_*.py'
 PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python - <<'PY'
-import dlib
-print(dlib.DLIB_USE_CUDA, dlib.cuda.get_num_devices())
+from src.preprocess.runtime import build_worker_assignments, build_worker_environment
+print(build_worker_assignments([0, 1, 2], 2))
+print(build_worker_environment(3, 4))
 PY
 ```
 
-结果：通过；`test_preprocess_runtime.py` 2 条用例通过，`test_mouth_roi.py` 3 条用例通过，全部 `unittest` 共 14 条通过，当前环境中 `dlib.DLIB_USE_CUDA = True` 且 `dlib.cuda.get_num_devices() = 1`。
+结果：通过；`test_preprocess_runtime.py` 3 条用例通过，全部 `unittest` 共 15 条通过，worker 设备轮转和线程环境变量输出符合预期。
 
 ## Git
 - branch: `main`
-- commit: `git commit -m "feat: add yaml-driven multi-process mouth roi preprocessing"`
+- commit: `git commit -m "feat: add multi-gpu yaml-driven preprocess runtime"`

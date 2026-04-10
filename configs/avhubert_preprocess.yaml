@@ -26,7 +26,10 @@ preprocess:
   strict: true
 
 runtime:
-  # Single-GPU default: shard over 2 workers to avoid overloading the 4090.
-  num_procs: 2
+  # Default for an 8x4090 + 88 vCPU host: 2 workers per GPU, 4 CPU threads per worker.
+  devices: [0, 1, 2, 3, 4, 5, 6, 7]
+  workers_per_device: 2
+  cpu_threads_per_worker: 4
   start_method: spawn
-  show_worker_progress: false
+  show_main_progress: true
+  show_worker_logs: false
