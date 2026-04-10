@@ -47,9 +47,13 @@ model:
 
 train:
   seed: 42
-  # Training entrypoint is GPU-only; use an explicit CUDA device.
-  device: cuda:0
+  # Set one or more CUDA device indices here. DDP is enabled automatically when len(devices) > 1.
+  devices: [0]
+  backend: nccl
+  master_addr: 127.0.0.1
+  master_port: 29501
   epochs: 10
+  # Per-GPU batch size and per-process DataLoader workers.
   batch_size: 4
   num_workers: 4
   learning_rate: 0.001
