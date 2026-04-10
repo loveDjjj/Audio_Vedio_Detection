@@ -2,17 +2,15 @@ from __future__ import annotations
 
 import csv
 import importlib
-import shutil
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import torch
 import torch.nn.functional as F
-from python_speech_features import logfbank
 from torch.utils.data import Dataset
 
+from src.data.audio_features import resolve_audio_feature_path, stack_audio_features
 from src.utils.avhubert_env import bootstrap_avhubert_repo
 
 
@@ -24,24 +22,13 @@ class SampleRecord:
     mouth_roi_path: Path
 
 
-def _stack_audio_features(features: np.ndarray, stack_order: int) -> np.ndarray:
-    if stack_order <= 1:
-        return features
-
-    feat_dim = features.shape[1]
-    remainder = len(features) % stack_order
-    if remainder:
-        padding = np.zeros((stack_order - remainder, feat_dim), dtype=features.dtype)
-        features = np.concatenate([features, padding], axis=0)
-    return features.reshape((-1, stack_order, feat_dim)).reshape(-1, stack_order * feat_dim)
-
-
 class AV1MMouthRoiDataset(Dataset):
     def __init__(
         self,
         csv_path: Path,
         raw_video_root: Path,
         mouth_roi_root: Path,
+        audio_feature_root: Path,
         avhubert_repo: Path,
         training: bool,
         image_crop_size: int,
@@ -60,14 +47,15 @@ class AV1MMouthRoiDataset(Dataset):
         self.csv_path = csv_path
         self.raw_video_root = raw_video_root
         self.mouth_roi_root = mouth_roi_root
+        self.audio_feature_root = audio_feature_root
         self.training = training
         self.stack_order_audio = stack_order_audio
         self.normalize_audio = normalize_audio
-        self.ffmpeg = shutil.which("ffmpeg")
         self.records: list[SampleRecord] = []
         self.missing_files = 0
         self.missing_mouth_roi_files = 0
         self.missing_raw_video_files = 0
+        self.missing_audio_feature_files = 0
 
         with csv_path.open("r", encoding="utf-8", newline="") as handle:
             reader = csv.DictReader(handle)
@@ -81,6 +69,11 @@ class AV1MMouthRoiDataset(Dataset):
                     continue
                 if not raw_video_path.exists():
                     self.missing_raw_video_files += 1
+                    self.missing_files += 1
+                    continue
+                audio_feature_path = resolve_audio_feature_path(audio_feature_root, relative_path)
+                if not audio_feature_path.exists():
+                    self.missing_audio_feature_files += 1
                     self.missing_files += 1
                     continue
                 self.records.append(
@@ -112,43 +105,16 @@ class AV1MMouthRoiDataset(Dataset):
     def __len__(self) -> int:
         return len(self.records)
 
-    def _load_audio_features(self, raw_video_path: Path) -> torch.Tensor:
-        if self.ffmpeg is None:
-            raise RuntimeError(
-                "ffmpeg is required for SSR-DFD style audio+video AV-HuBERT training. "
-                "Install ffmpeg first."
+    def _load_cached_audio_features(self, relative_path: str) -> torch.Tensor:
+        audio_feature_path = resolve_audio_feature_path(self.audio_feature_root, relative_path)
+        if not audio_feature_path.exists():
+            raise FileNotFoundError(
+                f"Missing cached audio features: {audio_feature_path}. "
+                "Run `python scripts/cache_av1m_audio_features.py` first."
             )
 
-        command = [
-            self.ffmpeg,
-            "-nostdin",
-            "-i",
-            str(raw_video_path),
-            "-vn",
-            "-ac",
-            "1",
-            "-ar",
-            "16000",
-            "-f",
-            "s16le",
-            "pipe:1",
-        ]
-        result = subprocess.run(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-        )
-        if result.returncode != 0:
-            error = result.stderr.decode("utf-8", errors="ignore").strip()
-            raise RuntimeError(f"ffmpeg failed for {raw_video_path}: {error}")
-
-        wav_data = np.frombuffer(result.stdout, dtype=np.int16)
-        if wav_data.ndim != 1 or wav_data.size == 0:
-            raise ValueError(f"Expected non-empty 16kHz mono PCM audio from {raw_video_path}.")
-
-        audio_features = logfbank(wav_data, samplerate=16_000).astype(np.float32)
-        audio_features = _stack_audio_features(audio_features, self.stack_order_audio)
+        audio_features = np.load(audio_feature_path).astype(np.float32)
+        audio_features = stack_audio_features(audio_features, self.stack_order_audio)
         audio = torch.from_numpy(audio_features.astype(np.float32))
         if self.normalize_audio:
             with torch.no_grad():
@@ -162,7 +128,7 @@ class AV1MMouthRoiDataset(Dataset):
         frames = self.transform(frames).astype(np.float32)
         frames = np.expand_dims(frames, axis=-1)
         video = torch.from_numpy(frames)
-        audio = self._load_audio_features(record.raw_video_path)
+        audio = self._load_cached_audio_features(record.relative_path)
 
         diff = audio.shape[0] - video.shape[0]
         if diff < 0:

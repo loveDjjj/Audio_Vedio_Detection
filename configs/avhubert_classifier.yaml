@@ -8,9 +8,11 @@ paths:
   manifest_dir: artifacts/avhubert/av1m_val_real_fullfake/manifests
   landmark_dir: artifacts/avhubert/av1m_val_real_fullfake/landmarks
   mouth_roi_root: artifacts/avhubert/av1m_val_real_fullfake/mouth_roi
+  audio_feature_root: artifacts/avhubert/av1m_val_real_fullfake/audio_features
   output_root: outputs/avhubert/av1m_val_real_fullfake
   checkpoint_path: model/self_large_vox_433h.pt
   avhubert_repo: third_party/av_hubert
+  ffmpeg_path: /usr/bin/ffmpeg
   cnn_detector_path: resources/dlib/mmod_human_face_detector.dat
   face_predictor_path: resources/dlib/shape_predictor_68_face_landmarks.dat
   mean_face_path: resources/avhubert/20words_mean_face.npy

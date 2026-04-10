@@ -18,6 +18,7 @@ model/
   self_large_vox_433h.pt
 scripts/
   build_avhubert_manifests.py
+  cache_av1m_audio_features.py
   preprocess_av1m_mouth_roi.py
   train_avhubert_classifier.py
 splits/
@@ -42,6 +43,7 @@ outputs/
 - [dataset/download_av1m_meta.py](dataset/download_av1m_meta.py)：下载 `AV-Deepfake1M` 的 `val` 分卷和 `val_metadata.json`，并调用 `7z` 解压。
 - [dataset/build_av1m_val_real_fullfake_splits.py](dataset/build_av1m_val_real_fullfake_splits.py)：从 `val_metadata.json` 中筛出 `real.mp4` 和 `fake_video_fake_audio.mp4`，随机生成 `train/val/test` 列表。
 - [scripts/build_avhubert_manifests.py](scripts/build_avhubert_manifests.py)：把 split CSV 转成 AV-HuBERT 预处理用的 `*.list`。
+- [scripts/cache_av1m_audio_features.py](scripts/cache_av1m_audio_features.py)：离线提取 raw mp4 的 16kHz mono 音频 logfbank，并缓存为训练可直接读取的 `.npy` 特征文件。
 - [scripts/preprocess_av1m_mouth_roi.py](scripts/preprocess_av1m_mouth_roi.py)：读取独立预处理 YAML，使用 dlib CUDA CNN face detector 做多进程、多卡分片 mouth ROI 预处理，并由主进程汇总进度和结果。
 - [scripts/train_avhubert_classifier.py](scripts/train_avhubert_classifier.py)：读取训练 YAML，按 `train.devices` 自动切换单卡或多卡 DDP，加载 frozen `AV-HuBERT` audio-visual backbone 和单层线性 probe，执行训练、验证和测试。
 
@@ -53,6 +55,7 @@ outputs/
 python dataset/download_av1m_meta.py
 python dataset/build_av1m_val_real_fullfake_splits.py
 python scripts/preprocess_av1m_mouth_roi.py
+python scripts/cache_av1m_audio_features.py
 python scripts/train_avhubert_classifier.py
 ```
 
@@ -89,7 +92,9 @@ python scripts/train_avhubert_classifier.py
 - `artifacts/avhubert/av1m_val_real_fullfake/manifests/`：`train.list`、`val.list`、`test.list`、`all.list`
 - `artifacts/avhubert/av1m_val_real_fullfake/landmarks/`：关键点检测结果
 - `artifacts/avhubert/av1m_val_real_fullfake/mouth_roi/`：裁剪后的嘴部 ROI 视频
+- `artifacts/avhubert/av1m_val_real_fullfake/audio_features/`：离线缓存的音频 logfbank 特征
 - `artifacts/avhubert/av1m_val_real_fullfake/preprocess.log`：预处理主进程日志；worker 日志会写成 `preprocess_rank*.log`
+- `artifacts/avhubert/av1m_val_real_fullfake/audio_cache.log`：音频缓存脚本日志
 - `outputs/avhubert/av1m_val_real_fullfake/<timestamp>/`：训练输出目录，包含 `config.yaml`、`train.log`、`best_head.pt`、`last_head.pt`、`summary.json`；多卡时其它 rank 会写 `train_rank*.log`
 
 ## 阅读顺序

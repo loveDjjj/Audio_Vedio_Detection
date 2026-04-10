@@ -55,6 +55,7 @@ def build_dataset(split_name: str, config: dict, training: bool, backbone_metada
         csv_path=resolve_path(paths["split_dir"]) / f"{split_name}.csv",
         raw_video_root=resolve_path(paths["raw_video_root"]),
         mouth_roi_root=resolve_path(paths["mouth_roi_root"]),
+        audio_feature_root=resolve_path(paths["audio_feature_root"]),
         avhubert_repo=resolve_path(paths["avhubert_repo"]),
         training=training,
         image_crop_size=data_cfg["image_crop_size"],
@@ -307,6 +308,9 @@ def run_worker(local_rank: int, config_path: str, run_dir: str) -> None:
             "train_missing_raw_video": train_dataset.missing_raw_video_files,
             "val_missing_raw_video": val_dataset.missing_raw_video_files,
             "test_missing_raw_video": test_dataset.missing_raw_video_files,
+            "train_missing_audio_features": train_dataset.missing_audio_feature_files,
+            "val_missing_audio_features": val_dataset.missing_audio_feature_files,
+            "test_missing_audio_features": test_dataset.missing_audio_feature_files,
             "audio_stack_order": float(backbone_metadata["stack_order_audio"]),
             "audio_normalize": float(backbone_metadata["audio_normalize"]),
         }
