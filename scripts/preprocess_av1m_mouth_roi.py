@@ -70,9 +70,11 @@ def main() -> int:
     if not mean_face_path.exists():
         raise FileNotFoundError(f"Missing mean face file: {mean_face_path}")
     if not cnn_detector_path.exists():
-        cnn_detector = None
-    else:
-        cnn_detector = cnn_detector_path
+        raise FileNotFoundError(
+            f"Missing CNN face detector: {cnn_detector_path}. "
+            "Strict preprocessing now requires the GPU CNN detector and does not fall back to HOG."
+        )
+    cnn_detector = cnn_detector_path
 
     rank = preprocess_cfg["rank"] if args.rank is None else args.rank
     nshard = preprocess_cfg["nshard"] if args.nshard is None else args.nshard

@@ -26,6 +26,19 @@ def _load_dependencies():
     return dlib
 
 
+def build_cnn_detector(dlib, cnn_detector_path: Path):
+    if not getattr(dlib, "DLIB_USE_CUDA", False):
+        raise RuntimeError(
+            "Strict CNN preprocessing requires a CUDA-enabled dlib build, "
+            "but `dlib.DLIB_USE_CUDA` is false."
+        )
+    if dlib.cuda.get_num_devices() < 1:
+        raise RuntimeError(
+            "Strict CNN preprocessing requires at least one CUDA device visible to dlib."
+        )
+    return dlib.cnn_face_detection_model_v1(str(cnn_detector_path))
+
+
 def read_manifest_ids(manifest_path: Path) -> list[str]:
     return [line.strip() for line in manifest_path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
@@ -57,9 +70,9 @@ def load_video_frames(video_path: Path) -> list[np.ndarray]:
 
 def detect_landmarks_for_frame(frame: np.ndarray, detector, cnn_detector, predictor):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    rects = detector(gray, 1)
-    if len(rects) == 0 and cnn_detector is not None:
-        rects = [result.rect for result in cnn_detector(gray)]
+    if cnn_detector is None:
+        raise RuntimeError("Strict CNN preprocessing requires `cnn_detector` to be initialized.")
+    rects = [result.rect for result in cnn_detector(gray)]
     if len(rects) == 0:
         return None
 
@@ -261,8 +274,13 @@ def process_manifest(
     file_ids = shard_items(read_manifest_ids(manifest_path), rank=rank, nshard=nshard)
     mean_face_landmarks = np.load(mean_face_path)
 
-    detector = dlib.get_frontal_face_detector() if stage in {"all", "detect"} else None
-    cnn_detector = dlib.cnn_face_detection_model_v1(str(cnn_detector_path)) if cnn_detector_path else None
+    detector = None
+    if cnn_detector_path is None:
+        raise RuntimeError(
+            "Strict preprocessing requires `resources/dlib/mmod_human_face_detector.dat` "
+            "and does not fall back to the CPU frontal-face detector."
+        )
+    cnn_detector = build_cnn_detector(dlib, cnn_detector_path)
     predictor = dlib.shape_predictor(str(face_predictor_path))
 
     summary = {

@@ -40,7 +40,7 @@ outputs/
 - [dataset/download_av1m_meta.py](dataset/download_av1m_meta.py)：下载 `AV-Deepfake1M` 的 `val` 分卷和 `val_metadata.json`，并调用 `7z` 解压。
 - [dataset/build_av1m_val_real_fullfake_splits.py](dataset/build_av1m_val_real_fullfake_splits.py)：从 `val_metadata.json` 中筛出 `real.mp4` 和 `fake_video_fake_audio.mp4`，随机生成 `train/val/test` 列表。
 - [scripts/build_avhubert_manifests.py](scripts/build_avhubert_manifests.py)：把 split CSV 转成 AV-HuBERT 预处理用的 `*.list`。
-- [scripts/preprocess_av1m_mouth_roi.py](scripts/preprocess_av1m_mouth_roi.py)：执行关键点检测、mouth ROI 裁剪，并把结果写到 `artifacts/`。
+- [scripts/preprocess_av1m_mouth_roi.py](scripts/preprocess_av1m_mouth_roi.py)：使用 dlib CUDA CNN face detector 执行关键点检测和 mouth ROI 裁剪，并把结果写到 `artifacts/`。
 - [scripts/train_avhubert_classifier.py](scripts/train_avhubert_classifier.py)：加载 frozen `AV-HuBERT` audio-visual backbone 和单层线性 probe，执行训练、验证和测试。
 
 ## 运行方法
@@ -62,6 +62,7 @@ python scripts/train_avhubert_classifier.py
 - 权重文件：`model/self_large_vox_433h.pt`
 - 第三方仓库：`third_party/av_hubert`
 - 外部工具：`ffmpeg`
+- 预处理设备：CUDA 可用的 NVIDIA GPU（当前 mouth ROI 预处理要求 dlib CUDA CNN detector，不再回退到 CPU HOG detector）
 - 训练设备：可用的 NVIDIA GPU（当前训练入口要求 `CUDA`，不再回退到 CPU）
 - 预处理资源：`resources/dlib/shape_predictor_68_face_landmarks.dat`、`resources/dlib/mmod_human_face_detector.dat`、`resources/avhubert/20words_mean_face.npy`
 
