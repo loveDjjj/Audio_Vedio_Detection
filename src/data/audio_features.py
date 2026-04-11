@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -12,6 +13,22 @@ def resolve_audio_feature_path(audio_feature_root: Path, relative_path: str) -> 
     if path.suffix != ".mp4":
         raise ValueError(f"Expected an .mp4 relative path, got: {relative_path}")
     return audio_feature_root / path.with_suffix(".npy")
+
+
+def resolve_ffmpeg_binary(configured_path: str | Path | None) -> str:
+    candidates: list[str] = []
+    if configured_path:
+        candidates.append(str(configured_path))
+    detected = shutil.which("ffmpeg")
+    if detected:
+        candidates.append(detected)
+
+    for candidate in candidates:
+        if Path(candidate).exists():
+            return candidate
+    raise FileNotFoundError(
+        "Unable to find `ffmpeg`. Set `paths.ffmpeg_path` to a valid executable or install ffmpeg into PATH."
+    )
 
 
 def extract_pcm16_audio_from_video(raw_video_path: Path, ffmpeg: str) -> np.ndarray:

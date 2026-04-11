@@ -35,6 +35,7 @@ from src.train.runtime import (
 )
 from src.utils.logging_utils import build_logger
 from src.utils.project import ensure_dir, load_config, resolve_path, seed_everything
+from src.visualization.training_curves import plot_training_summary
 
 
 def parse_args() -> argparse.Namespace:
@@ -315,6 +316,17 @@ def run_worker(local_rank: int, config_path: str, run_dir: str) -> None:
             "audio_normalize": float(backbone_metadata["audio_normalize"]),
         }
         logger.info("Dataset summary: %s", dataset_summary)
+        if train_dataset.missing_audio_feature_files > 0:
+            logger.warning(
+                "Training split is missing %s cached audio feature files under %s",
+                train_dataset.missing_audio_feature_files,
+                resolve_path(paths["audio_feature_root"]),
+            )
+        if len(train_dataset) == 0:
+            raise RuntimeError(
+                "No training samples remain after filtering for cached audio features. "
+                "Run `python scripts/cache_av1m_audio_features.py` successfully first."
+            )
 
         for epoch in range(1, train_cfg["epochs"] + 1):
             if train_sampler is not None:
@@ -364,6 +376,17 @@ def run_worker(local_rank: int, config_path: str, run_dir: str) -> None:
                 }
                 history.append(record)
                 logger.info("Epoch metrics: %s", json.dumps(record, ensure_ascii=False))
+                if config["visualization"]["enabled"]:
+                    preview_summary = {
+                        "history": history,
+                    }
+                    preview_path = run_dir_path / "summary.preview.json"
+                    with preview_path.open("w", encoding="utf-8") as handle:
+                        json.dump(preview_summary, handle, indent=2, ensure_ascii=False)
+                    plot_training_summary(
+                        summary_path=preview_path,
+                        output_path=run_dir_path / config["visualization"]["output_filename"],
+                    )
 
                 save_head_checkpoint(last_path, epoch=epoch, model=model, metrics=val_metrics, config=config)
                 if val_metrics["f1"] > best_val_f1:
@@ -408,6 +431,11 @@ def run_worker(local_rank: int, config_path: str, run_dir: str) -> None:
             }
             with (run_dir_path / "summary.json").open("w", encoding="utf-8") as handle:
                 json.dump(summary, handle, indent=2, ensure_ascii=False)
+            if config["visualization"]["enabled"]:
+                plot_training_summary(
+                    summary_path=run_dir_path / "summary.json",
+                    output_path=run_dir_path / config["visualization"]["output_filename"],
+                )
             logger.info("Training summary: %s", json.dumps(summary, ensure_ascii=False))
     finally:
         cleanup_process_group()

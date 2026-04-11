@@ -48,6 +48,7 @@ class AV1MMouthRoiDataset(Dataset):
         self.raw_video_root = raw_video_root
         self.mouth_roi_root = mouth_roi_root
         self.audio_feature_root = audio_feature_root
+        self.avhubert_repo = avhubert_repo
         self.training = training
         self.stack_order_audio = stack_order_audio
         self.normalize_audio = normalize_audio
@@ -104,6 +105,17 @@ class AV1MMouthRoiDataset(Dataset):
 
     def __len__(self) -> int:
         return len(self.records)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state["avhubert_utils"] = None
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        if self.__dict__.get("avhubert_utils") is None:
+            bootstrap_avhubert_repo(self.__dict__["avhubert_repo"])
+            self.avhubert_utils = importlib.import_module("avhubert.utils")
 
     def _load_cached_audio_features(self, relative_path: str) -> torch.Tensor:
         audio_feature_path = resolve_audio_feature_path(self.audio_feature_root, relative_path)

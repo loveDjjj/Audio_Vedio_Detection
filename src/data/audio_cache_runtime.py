@@ -13,6 +13,7 @@ from tqdm import tqdm
 from src.data.audio_features import (
     compute_logfbank_features,
     resolve_audio_feature_path,
+    resolve_ffmpeg_binary,
     stack_audio_features,
 )
 from src.utils.logging_utils import build_logger
@@ -88,7 +89,7 @@ def _run_audio_cache_shard(
     split_dir = resolve_path(paths["split_dir"])
     audio_feature_root = ensure_dir(paths["audio_feature_root"])
     ffmpeg = resolve_path(paths["ffmpeg_path"]) if paths.get("ffmpeg_path") else None
-    ffmpeg_bin = str(ffmpeg) if ffmpeg is not None else "ffmpeg"
+    ffmpeg_bin = resolve_ffmpeg_binary(ffmpeg)
     relative_paths = split_relative_paths_for_rank(_load_relative_paths(split_dir), rank=rank, nshard=nshard)
 
     cpu_threads_per_worker = int(cache_cfg["cpu_threads_per_worker"])
@@ -156,6 +157,8 @@ def run_audio_cache_from_config(config_path: Path = Path("configs/avhubert_class
     relative_paths = _load_relative_paths(split_dir)
     num_procs = int(cache_cfg["num_procs"])
     show_progress = bool(cache_cfg.get("show_progress", True))
+    ffmpeg = resolve_path(paths["ffmpeg_path"]) if paths.get("ffmpeg_path") else None
+    ffmpeg_bin = resolve_ffmpeg_binary(ffmpeg)
 
     logger = build_logger(
         name="audio-cache.main",
@@ -164,8 +167,9 @@ def run_audio_cache_from_config(config_path: Path = Path("configs/avhubert_class
         console=True,
     )
     logger.info(
-        "Audio cache config=%s num_procs=%s cpu_threads_per_worker=%s stack_order_audio=%s",
+        "Audio cache config=%s ffmpeg=%s num_procs=%s cpu_threads_per_worker=%s stack_order_audio=%s",
         resolve_path(config_path),
+        ffmpeg_bin,
         num_procs,
         cache_cfg["cpu_threads_per_worker"],
         cache_cfg["stack_order_audio"],
