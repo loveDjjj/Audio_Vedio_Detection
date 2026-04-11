@@ -24,6 +24,7 @@ SUMMARY_KEYS = [
     "skipped_existing_mouth_roi",
     "skipped_existing_landmarks",
     "failed_missing_video",
+    "failed_read_video",
     "failed_missing_landmarks",
     "failed_no_landmarks",
     "failed_crop",

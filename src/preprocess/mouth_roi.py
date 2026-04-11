@@ -296,6 +296,7 @@ def process_manifest(
         "skipped_existing_mouth_roi": 0,
         "skipped_existing_landmarks": 0,
         "failed_missing_video": 0,
+        "failed_read_video": 0,
         "failed_missing_landmarks": 0,
         "failed_no_landmarks": 0,
         "failed_crop": 0,
@@ -320,7 +321,14 @@ def process_manifest(
                 if progress_callback is not None:
                     progress_callback(file_id)
                 continue
-            landmarks = detect_landmarks_for_video(raw_video_path, detector, cnn_detector, predictor)
+            try:
+                landmarks = detect_landmarks_for_video(raw_video_path, detector, cnn_detector, predictor)
+            except Exception as exc:
+                summary["failed_read_video"] += 1
+                summary["failed_files"].append({"file_id": file_id, "reason": f"read_video_failed:{exc}"})
+                if progress_callback is not None:
+                    progress_callback(file_id)
+                continue
             landmark_path.parent.mkdir(parents=True, exist_ok=True)
             with landmark_path.open("wb") as handle:
                 pickle.dump(landmarks, handle)
@@ -339,7 +347,14 @@ def process_manifest(
             with landmark_path.open("rb") as handle:
                 landmarks = pickle.load(handle)
         elif stage == "all":
-            landmarks = detect_landmarks_for_video(raw_video_path, detector, cnn_detector, predictor)
+            try:
+                landmarks = detect_landmarks_for_video(raw_video_path, detector, cnn_detector, predictor)
+            except Exception as exc:
+                summary["failed_read_video"] += 1
+                summary["failed_files"].append({"file_id": file_id, "reason": f"read_video_failed:{exc}"})
+                if progress_callback is not None:
+                    progress_callback(file_id)
+                continue
             if save_landmarks:
                 landmark_path.parent.mkdir(parents=True, exist_ok=True)
                 with landmark_path.open("wb") as handle:

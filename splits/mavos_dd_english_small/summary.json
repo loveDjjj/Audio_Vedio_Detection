@@ -34,13 +34,13 @@
       }
     },
     "test": {
-      "videos": 1591,
+      "videos": 1590,
       "labels": {
-        "fake": 1028,
+        "fake": 1027,
         "real": 563
       },
       "generative_methods": {
-        "hififace": 423,
+        "hififace": 422,
         "real": 810,
         "roop": 291,
         "sonic": 67

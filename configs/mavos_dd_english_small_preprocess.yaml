@@ -26,7 +26,7 @@ preprocess:
   strict: true
 
 runtime:
-  devices: [0]
+  devices: [0,1,2,3,4,5,6,7]
   workers_per_device: 2
   cpu_threads_per_worker: 4
   start_method: spawn
