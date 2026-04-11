@@ -3,6 +3,8 @@
 !/dataset/AV-Deepfake1M/.gitkeep
 /dataset/MAVOS-DD-meta/*
 !/dataset/MAVOS-DD-meta/.gitkeep
+/dataset/MAVOS-DD-english/*
+!/dataset/MAVOS-DD-english/.gitkeep
 /dataset/FakeAVCeleb/*
 !/dataset/FakeAVCeleb/.gitkeep
 /model/*
