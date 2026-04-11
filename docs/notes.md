@@ -1,39 +1,35 @@
 # Notes
 
 ## 需求
-实现英语子集的 MAVOS-DD 小样本 split 构建和按样本下载脚本，用于多生成器 pilot。
+为 MAVOS-DD 英语小样本补齐专用配置和零参数 wrapper，方便数据迁移后直接复用现有 AV-HuBERT 训练链。
 
 ## 修改文件
 - README.md
-- dataset/build_mavos_dd_english_splits.py
-- dataset/download_mavos_dd_selected_files.py
-- src/data/mavos_dd_subset.py
-- tests/test_mavos_dd_subset.py
+- configs/mavos_dd_english_small_preprocess.yaml
+- configs/mavos_dd_english_small_classifier.yaml
+- scripts/preprocess_mavos_dd_english_small.py
+- scripts/cache_mavos_dd_english_small_audio_features.py
+- scripts/train_mavos_dd_english_small.py
+- scripts/plot_mavos_dd_english_small.py
+- tests/test_mavos_dd_wrappers.py
 - docs/notes.md
 - docs/logs/2026-04.md
 
 ## 修改内容
-- 新增 `dataset/build_mavos_dd_english_splits.py`，从本地 MAVOS-DD metadata 中构建英语小样本 `train.csv`、`val.csv`、`test.csv`。
-- 采样策略固定为：
-  - `train`: 英语 `train` split 按生成器分层抽样
-  - `val`: 英语 `validation` 全量保留
-  - `test`: 英语 `test` 且 `open_set_model=true`，按生成器分层抽样
-- 新增 `dataset/download_mavos_dd_selected_files.py`，只下载上述 CSV 中出现的样本文件。
-- 新增 `src/data/mavos_dd_subset.py` 和回归测试，保证分层抽样不会丢生成器覆盖。
-- 用真实 metadata 做了 smoke check，英语 1/5 方案得到：
-  - `train = 1277`
-  - `val = 1079`
-  - `test = 1591`
+- 新增 `configs/mavos_dd_english_small_preprocess.yaml` 与 `configs/mavos_dd_english_small_classifier.yaml`，将现有预处理、音频缓存、训练、绘图链路完整映射到 `mavos_dd_english_small` 路径。
+- 新增四个零参数 wrapper：预处理、音频缓存、训练、绘图，减少手工传 `--config` 的操作。
+- 保持你已经在服务器上使用的英语小样本 split / 下载脚本不变，不再改动其采样和下载逻辑。
+- 这一步只做“路径和入口适配”，不重写 dataset / model / train 主逻辑。
 
 ## 验证
 ```bash
-PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_mavos_dd_subset.py'
-PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python dataset/build_mavos_dd_english_splits.py --metadata-root dataset/MAVOS-DD-meta --output-dir /tmp/mavos_dd_english_small_test --train-ratio 0.2 --test-ratio 0.2
-PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python dataset/download_mavos_dd_selected_files.py --help
+PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_mavos_dd_wrappers.py'
+PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python scripts/train_mavos_dd_english_small.py --help
+PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python scripts/plot_mavos_dd_english_small.py --help
 ```
 
-结果：通过；`test_mavos_dd_subset.py` 2 条用例通过，英语 1/5 采样 split 成功生成，下载脚本入口可正常启动。
+结果：通过；`test_mavos_dd_wrappers.py` 1 条用例通过，英语小样本训练和绘图 wrapper 入口可正常启动。
 
 ## Git
 - branch: `main`
-- commit: `git commit -m "feat: add mavos-dd english subset tools"`
+- commit: `git commit -m "feat: add mavos-dd english small wrappers"`

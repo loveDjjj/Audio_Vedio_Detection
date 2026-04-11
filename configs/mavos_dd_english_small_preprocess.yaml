@@ -1,0 +1,39 @@
+paths:
+  split_dir: splits/mavos_dd_english_small
+  raw_video_root: dataset/MAVOS-DD-english-small
+  artifact_root: artifacts/avhubert/mavos_dd_english_small
+  manifest_dir: artifacts/avhubert/mavos_dd_english_small/manifests
+  landmark_dir: artifacts/avhubert/mavos_dd_english_small/landmarks
+  mouth_roi_root: artifacts/avhubert/mavos_dd_english_small/mouth_roi
+  cnn_detector_path: resources/dlib/mmod_human_face_detector.dat
+  face_predictor_path: resources/dlib/shape_predictor_68_face_landmarks.dat
+  mean_face_path: resources/avhubert/20words_mean_face.npy
+
+preprocess:
+  split_names:
+    - train
+    - val
+    - test
+  manifest_name: all
+  stage: all
+  crop_width: 96
+  crop_height: 96
+  start_idx: 48
+  stop_idx: 68
+  window_margin: 12
+  fps: 25
+  save_landmarks: true
+  strict: true
+
+runtime:
+  devices: [0]
+  workers_per_device: 2
+  cpu_threads_per_worker: 4
+  start_method: spawn
+  show_main_progress: true
+  show_worker_logs: false
+
+logging:
+  level: INFO
+  main_log_filename: preprocess.log
+  worker_log_filename_template: preprocess_rank{rank}.log

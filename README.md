@@ -10,6 +10,8 @@
 configs/
   avhubert_classifier.yaml
   avhubert_preprocess.yaml
+  mavos_dd_english_small_classifier.yaml
+  mavos_dd_english_small_preprocess.yaml
 dataset/
   AV-Deepfake1M/
   build_mavos_dd_english_splits.py
@@ -23,8 +25,12 @@ scripts/
   cache_av1m_audio_features.py
   inspect_mavos_dd_metadata.py
   plot_training_summary.py
+  plot_mavos_dd_english_small.py
   preprocess_av1m_mouth_roi.py
+  preprocess_mavos_dd_english_small.py
   train_avhubert_classifier.py
+  train_mavos_dd_english_small.py
+  cache_mavos_dd_english_small_audio_features.py
 splits/
   av1m_val_real_fullfake/
 src/
@@ -44,6 +50,8 @@ outputs/
 
 - [configs/avhubert_classifier.yaml](configs/avhubert_classifier.yaml)：当前训练主配置，集中管理训练数据路径、模型、单卡/多卡 DDP 参数和训练参数。
 - [configs/avhubert_preprocess.yaml](configs/avhubert_preprocess.yaml)：当前预处理配置，集中管理 mouth ROI 预处理路径、裁剪参数、多进程和多卡运行参数。
+- [configs/mavos_dd_english_small_classifier.yaml](configs/mavos_dd_english_small_classifier.yaml)：MAVOS-DD 英语小样本训练配置，复用当前 AV-HuBERT 训练链并切换到 `mavos_dd_english_small` 路径。
+- [configs/mavos_dd_english_small_preprocess.yaml](configs/mavos_dd_english_small_preprocess.yaml)：MAVOS-DD 英语小样本预处理配置，复用当前 mouth ROI 预处理链并切换到 `mavos_dd_english_small` 路径。
 - [dataset/download_av1m_meta.py](dataset/download_av1m_meta.py)：下载 `AV-Deepfake1M` 的 `val` 分卷和 `val_metadata.json`，并调用 `7z` 解压。
 - [dataset/build_av1m_val_real_fullfake_splits.py](dataset/build_av1m_val_real_fullfake_splits.py)：从 `val_metadata.json` 中筛出 `real.mp4` 和 `fake_video_fake_audio.mp4`，随机生成 `train/val/test` 列表。
 - [dataset/build_mavos_dd_english_splits.py](dataset/build_mavos_dd_english_splits.py)：从本地 MAVOS-DD metadata 中筛出英语子集，生成小规模 `train/val/test` CSV。
@@ -54,6 +62,10 @@ outputs/
 - [scripts/plot_training_summary.py](scripts/plot_training_summary.py)：读取已有 `summary.json`，单独生成训练曲线图，不需要重跑训练。
 - [scripts/preprocess_av1m_mouth_roi.py](scripts/preprocess_av1m_mouth_roi.py)：读取独立预处理 YAML，使用 dlib CUDA CNN face detector 做多进程、多卡分片 mouth ROI 预处理，并由主进程汇总进度和结果。
 - [scripts/train_avhubert_classifier.py](scripts/train_avhubert_classifier.py)：读取训练 YAML，按 `train.devices` 自动切换单卡或多卡 DDP，加载 frozen `AV-HuBERT` audio-visual backbone 和单层线性 probe，执行训练、验证和测试。
+- [scripts/preprocess_mavos_dd_english_small.py](scripts/preprocess_mavos_dd_english_small.py)：零参数入口，直接使用 `configs/mavos_dd_english_small_preprocess.yaml` 预处理 MAVOS-DD 英语小样本。
+- [scripts/cache_mavos_dd_english_small_audio_features.py](scripts/cache_mavos_dd_english_small_audio_features.py)：零参数入口，直接使用 `configs/mavos_dd_english_small_classifier.yaml` 缓存 MAVOS-DD 英语小样本音频特征。
+- [scripts/train_mavos_dd_english_small.py](scripts/train_mavos_dd_english_small.py)：零参数入口，直接使用 `configs/mavos_dd_english_small_classifier.yaml` 训练 MAVOS-DD 英语小样本。
+- [scripts/plot_mavos_dd_english_small.py](scripts/plot_mavos_dd_english_small.py)：读取 MAVOS-DD 英语小样本 `summary.json` 并绘图。
 
 ## 运行方法
 
@@ -69,6 +81,10 @@ python scripts/plot_training_summary.py --summary outputs/.../summary.json
 python scripts/inspect_mavos_dd_metadata.py --metadata-root dataset/MAVOS-DD-meta
 python dataset/build_mavos_dd_english_splits.py
 python dataset/download_mavos_dd_selected_files.py
+python scripts/preprocess_mavos_dd_english_small.py
+python scripts/cache_mavos_dd_english_small_audio_features.py
+python scripts/train_mavos_dd_english_small.py
+python scripts/plot_mavos_dd_english_small.py --summary outputs/avhubert/mavos_dd_english_small/.../summary.json
 ```
 
 运行前需要确认以下资源已经就位：
@@ -98,6 +114,14 @@ python dataset/download_mavos_dd_selected_files.py
   - `data`：帧数上限、裁剪尺寸、图像归一化和 batch 处理方式
   - `model`：当前只保留是否冻结 backbone；分类头固定为单层线性 probe
   - `train`：DDP 设备列表、后端、master 地址端口，以及每 GPU 的 batch size / worker 数和训练参数
+- [configs/mavos_dd_english_small_preprocess.yaml](configs/mavos_dd_english_small_preprocess.yaml)
+  - `paths`：MAVOS-DD 英语小样本的 split、raw video、landmark、mouth ROI 路径
+  - `preprocess`：沿用当前 mouth ROI 裁剪参数
+  - `runtime`：预处理设备列表、worker 数和日志配置
+- [configs/mavos_dd_english_small_classifier.yaml](configs/mavos_dd_english_small_classifier.yaml)
+  - `paths`：MAVOS-DD 英语小样本的 split、mouth ROI、audio feature、output 路径
+  - `audio_cache`：英语小样本音频缓存的多进程配置
+  - `train`：英语小样本训练的单卡/多卡 DDP 配置
 
 ## 输出说明
 
