@@ -5,6 +5,7 @@
 !/dataset/MAVOS-DD-meta/.gitkeep
 /dataset/MAVOS-DD-english/*
 !/dataset/MAVOS-DD-english/.gitkeep
+/dataset/MAVOS-DD-english-small/*
 /dataset/FakeAVCeleb/*
 !/dataset/FakeAVCeleb/.gitkeep
 /model/*
