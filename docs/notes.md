@@ -1,37 +1,27 @@
 # Notes
 
 ## 需求
-修复 MAVOS-DD 英语小样本预处理中“单个坏视频会打崩整轮”的问题，并将已确认损坏的样本从当前 `test` split 中移除，避免后续预处理、音频缓存和训练再次纳入。
+修复 MAVOS-DD 英语小样本音频缓存阶段在 `spawn + ProcessPoolExecutor` 下的多进程启动错误，使 `scripts/cache_mavos_dd_english_small_audio_features.py` 能正常启动并继续后续缓存。
 
 ## 修改文件
-- src/preprocess/mouth_roi.py
-- src/preprocess/runtime.py
-- splits/mavos_dd_english_small/test.csv
-- splits/mavos_dd_english_small/summary.json
-- tests/test_mouth_roi.py
+- src/data/audio_cache_runtime.py
+- tests/test_audio_cache_runtime.py
 - docs/notes.md
 - docs/logs/2026-04.md
 
 ## 修改内容
-- 在 `process_manifest()` 中为检测阶段补上坏视频保护：当 `detect_landmarks_for_video()` 因损坏 mp4 无法读帧时报错时，记录为 `failed_read_video` 并继续处理其它样本，不再让整个多进程预处理中断。
-- 在预处理 summary 聚合中新增 `failed_read_video` 统计，确保主 summary 能正确汇总这类单文件失败。
-- 将已确认损坏的 `english/hififace/29084-cbtkoZUOR1A_83_7.mp4` 从当前 `splits/mavos_dd_english_small/test.csv` 中移除，并同步更新 `splits/mavos_dd_english_small/summary.json` 的视频数、标签数和生成器计数。
-- 新增回归测试，覆盖“坏视频应记失败并继续”的场景。
+- 为音频缓存 runtime 新增 `build_audio_cache_progress_queue()`，统一使用 `Manager().Queue()` 构造跨进程进度队列，避免普通 `Queue` 在 `spawn` 模式下被 `ProcessPoolExecutor` pickle 时抛出 `Queue objects should only be shared between processes through inheritance`。
+- 将多进程音频缓存主流程切换到 manager-backed queue，并在结束时显式 `manager.shutdown()`。
+- 新增回归测试，覆盖“必须使用 manager queue，而不是 plain context Queue”的约束。
 
 ## 验证
 ```bash
+PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_audio_cache_runtime.py'
 PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_mouth_roi.py'
-python - <<'PY'
-import csv
-from pathlib import Path
-needle = "english/hififace/29084-cbtkoZUOR1A_83_7.mp4"
-rows = list(csv.DictReader(Path("splits/mavos_dd_english_small/test.csv").open()))
-print({"test_rows": len(rows), "contains_bad_row": any(row["relative_path"] == needle for row in rows)})
-PY
 ```
 
-结果：通过；`test_mouth_roi.py` 4 条用例通过，当前 `test.csv` 共 `1590` 条，坏样本已不在 split 中。
+结果：通过；`test_audio_cache_runtime.py` 4 条用例通过，`test_mouth_roi.py` 4 条用例通过。
 
 ## Git
 - branch: `main`
-- commit: `git commit -m "fix: skip unreadable mavos preprocess videos"`
+- commit: `git commit -m "fix: use manager queue for audio cache workers"`

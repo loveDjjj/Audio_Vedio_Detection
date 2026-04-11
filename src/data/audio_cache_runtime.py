@@ -35,6 +35,11 @@ def build_audio_cache_assignments(num_procs: int) -> list[dict[str, int]]:
     return [{"rank": rank, "nshard": num_procs} for rank in range(num_procs)]
 
 
+def build_audio_cache_progress_queue(mp_context):
+    manager = mp_context.Manager()
+    return manager, manager.Queue()
+
+
 def split_relative_paths_for_rank(relative_paths: list[str], rank: int, nshard: int) -> list[str]:
     if rank < 0 or rank >= nshard:
         raise ValueError(f"rank must be in [0, {nshard - 1}], got {rank}")
@@ -180,7 +185,7 @@ def run_audio_cache_from_config(config_path: Path = Path("configs/avhubert_class
         shard_summaries = [_run_audio_cache_shard(str(config_path), rank=0, nshard=1, progress_queue=None)]
     else:
         mp_context = mp.get_context(cache_cfg.get("start_method", "spawn"))
-        progress_queue = mp_context.Queue()
+        manager, progress_queue = build_audio_cache_progress_queue(mp_context)
         progress_bar = tqdm(total=len(relative_paths), desc="audio-cache", leave=False) if show_progress else None
         try:
             with ProcessPoolExecutor(max_workers=num_procs, mp_context=mp_context) as executor:
@@ -217,6 +222,7 @@ def run_audio_cache_from_config(config_path: Path = Path("configs/avhubert_class
         finally:
             if progress_bar is not None:
                 progress_bar.close()
+            manager.shutdown()
 
     combined_summary = aggregate_audio_cache_summaries(shard_summaries)
     combined_summary["config_path"] = str(resolve_path(config_path))
