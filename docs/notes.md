@@ -1,32 +1,39 @@
 # Notes
 
 ## 需求
-实现 MAVOS-DD metadata 本地统计脚本，并安装 `datasets / pyarrow / pandas` 依赖。
+实现英语子集的 MAVOS-DD 小样本 split 构建和按样本下载脚本，用于多生成器 pilot。
 
 ## 修改文件
 - README.md
-- requirements.txt
-- scripts/inspect_mavos_dd_metadata.py
-- src/data/mavos_dd_metadata.py
-- tests/test_mavos_dd_metadata.py
+- dataset/build_mavos_dd_english_splits.py
+- dataset/download_mavos_dd_selected_files.py
+- src/data/mavos_dd_subset.py
+- tests/test_mavos_dd_subset.py
 - docs/notes.md
 - docs/logs/2026-04.md
 
 ## 修改内容
-- 新增 `src/data/mavos_dd_metadata.py`，负责定位本地 `data-*.arrow`、读取记录并统计 split / language / generative_method / open-set 标记分布。
-- 新增 `scripts/inspect_mavos_dd_metadata.py`，可直接对本地 `dataset/MAVOS-DD-meta` 导出 `mavos_dd_summary.json`。
-- 在 `avhubert` 环境中安装 `datasets`、`pyarrow`、`pandas`，满足读取 Hugging Face Arrow metadata 的依赖。
-- README 和 requirements 已同步补充 MAVOS-DD metadata 工具说明与依赖。
-- 当前本地 `dataset/MAVOS-DD-meta` 目录里只有 `README.md`，metadata Arrow 文件尚未拉到本地，所以脚本已可用但还不能在这台机器上直接产出真实 MAVOS-DD 分布统计。
+- 新增 `dataset/build_mavos_dd_english_splits.py`，从本地 MAVOS-DD metadata 中构建英语小样本 `train.csv`、`val.csv`、`test.csv`。
+- 采样策略固定为：
+  - `train`: 英语 `train` split 按生成器分层抽样
+  - `val`: 英语 `validation` 全量保留
+  - `test`: 英语 `test` 且 `open_set_model=true`，按生成器分层抽样
+- 新增 `dataset/download_mavos_dd_selected_files.py`，只下载上述 CSV 中出现的样本文件。
+- 新增 `src/data/mavos_dd_subset.py` 和回归测试，保证分层抽样不会丢生成器覆盖。
+- 用真实 metadata 做了 smoke check，英语 1/5 方案得到：
+  - `train = 1277`
+  - `val = 1079`
+  - `test = 1591`
 
 ## 验证
 ```bash
-PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_mavos_dd_metadata.py'
-/root/shared-nvme/conda/envs/avhubert/bin/python -m pip show datasets pyarrow pandas
+PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python -m unittest discover -s tests -p 'test_mavos_dd_subset.py'
+PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python dataset/build_mavos_dd_english_splits.py --metadata-root dataset/MAVOS-DD-meta --output-dir /tmp/mavos_dd_english_small_test --train-ratio 0.2 --test-ratio 0.2
+PYTHONDONTWRITEBYTECODE=1 /root/shared-nvme/conda/envs/avhubert/bin/python dataset/download_mavos_dd_selected_files.py --help
 ```
 
-结果：通过；`test_mavos_dd_metadata.py` 1 条用例通过，且 `datasets / pyarrow / pandas` 已安装到 `avhubert` 环境。
+结果：通过；`test_mavos_dd_subset.py` 2 条用例通过，英语 1/5 采样 split 成功生成，下载脚本入口可正常启动。
 
 ## Git
 - branch: `main`
-- commit: `git commit -m "feat: add mavos-dd metadata inspector"`
+- commit: `git commit -m "feat: add mavos-dd english subset tools"`

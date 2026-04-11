@@ -1,0 +1,50 @@
+{
+  "dataset": "MAVOS-DD",
+  "language": "english",
+  "train_ratio": 0.2,
+  "test_ratio": 0.2,
+  "seed": 42,
+  "splits": {
+    "train": {
+      "videos": 1277,
+      "labels": {
+        "fake": 638,
+        "real": 639
+      },
+      "generative_methods": {
+        "echomimic": 49,
+        "real": 667,
+        "inswapper": 487,
+        "liveportrait": 27,
+        "memo": 47
+      }
+    },
+    "val": {
+      "videos": 1079,
+      "labels": {
+        "fake": 566,
+        "real": 513
+      },
+      "generative_methods": {
+        "echomimic": 36,
+        "real": 563,
+        "inswapper": 397,
+        "liveportrait": 18,
+        "memo": 65
+      }
+    },
+    "test": {
+      "videos": 1591,
+      "labels": {
+        "fake": 1028,
+        "real": 563
+      },
+      "generative_methods": {
+        "hififace": 423,
+        "real": 810,
+        "roop": 291,
+        "sonic": 67
+      }
+    }
+  }
+}

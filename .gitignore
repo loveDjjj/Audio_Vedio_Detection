@@ -1,6 +1,8 @@
 # Dataset payloads
 /dataset/AV-Deepfake1M/*
 !/dataset/AV-Deepfake1M/.gitkeep
+/dataset/MAVOS-DD-meta/*
+!/dataset/MAVOS-DD-meta/.gitkeep
 /dataset/FakeAVCeleb/*
 !/dataset/FakeAVCeleb/.gitkeep
 /model/*

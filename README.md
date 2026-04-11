@@ -12,7 +12,9 @@ configs/
   avhubert_preprocess.yaml
 dataset/
   AV-Deepfake1M/
+  build_mavos_dd_english_splits.py
   download_av1m_meta.py
+  download_mavos_dd_selected_files.py
   build_av1m_val_real_fullfake_splits.py
 model/
   self_large_vox_433h.pt
@@ -44,6 +46,8 @@ outputs/
 - [configs/avhubert_preprocess.yaml](configs/avhubert_preprocess.yaml)：当前预处理配置，集中管理 mouth ROI 预处理路径、裁剪参数、多进程和多卡运行参数。
 - [dataset/download_av1m_meta.py](dataset/download_av1m_meta.py)：下载 `AV-Deepfake1M` 的 `val` 分卷和 `val_metadata.json`，并调用 `7z` 解压。
 - [dataset/build_av1m_val_real_fullfake_splits.py](dataset/build_av1m_val_real_fullfake_splits.py)：从 `val_metadata.json` 中筛出 `real.mp4` 和 `fake_video_fake_audio.mp4`，随机生成 `train/val/test` 列表。
+- [dataset/build_mavos_dd_english_splits.py](dataset/build_mavos_dd_english_splits.py)：从本地 MAVOS-DD metadata 中筛出英语子集，生成小规模 `train/val/test` CSV。
+- [dataset/download_mavos_dd_selected_files.py](dataset/download_mavos_dd_selected_files.py)：按英语小样本 CSV 中的 `relative_path` 只下载被选中的 MAVOS-DD 视频文件。
 - [scripts/build_avhubert_manifests.py](scripts/build_avhubert_manifests.py)：把 split CSV 转成 AV-HuBERT 预处理用的 `*.list`。
 - [scripts/cache_av1m_audio_features.py](scripts/cache_av1m_audio_features.py)：按多进程方式离线提取 raw mp4 的 16kHz mono 音频 logfbank，并直接缓存为训练最终读取的 stacked `.npy` 特征文件。
 - [scripts/inspect_mavos_dd_metadata.py](scripts/inspect_mavos_dd_metadata.py)：读取本地 MAVOS-DD metadata Arrow 文件，统计 split / language / generative_method / open-set 标记分布并导出 JSON 摘要。
@@ -63,6 +67,8 @@ python scripts/cache_av1m_audio_features.py
 python scripts/train_avhubert_classifier.py
 python scripts/plot_training_summary.py --summary outputs/.../summary.json
 python scripts/inspect_mavos_dd_metadata.py --metadata-root dataset/MAVOS-DD-meta
+python dataset/build_mavos_dd_english_splits.py
+python dataset/download_mavos_dd_selected_files.py
 ```
 
 运行前需要确认以下资源已经就位：
