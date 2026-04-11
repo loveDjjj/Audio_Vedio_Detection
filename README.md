@@ -19,6 +19,7 @@ model/
 scripts/
   build_avhubert_manifests.py
   cache_av1m_audio_features.py
+  inspect_mavos_dd_metadata.py
   plot_training_summary.py
   preprocess_av1m_mouth_roi.py
   train_avhubert_classifier.py
@@ -45,6 +46,7 @@ outputs/
 - [dataset/build_av1m_val_real_fullfake_splits.py](dataset/build_av1m_val_real_fullfake_splits.py)：从 `val_metadata.json` 中筛出 `real.mp4` 和 `fake_video_fake_audio.mp4`，随机生成 `train/val/test` 列表。
 - [scripts/build_avhubert_manifests.py](scripts/build_avhubert_manifests.py)：把 split CSV 转成 AV-HuBERT 预处理用的 `*.list`。
 - [scripts/cache_av1m_audio_features.py](scripts/cache_av1m_audio_features.py)：按多进程方式离线提取 raw mp4 的 16kHz mono 音频 logfbank，并直接缓存为训练最终读取的 stacked `.npy` 特征文件。
+- [scripts/inspect_mavos_dd_metadata.py](scripts/inspect_mavos_dd_metadata.py)：读取本地 MAVOS-DD metadata Arrow 文件，统计 split / language / generative_method / open-set 标记分布并导出 JSON 摘要。
 - [scripts/plot_training_summary.py](scripts/plot_training_summary.py)：读取已有 `summary.json`，单独生成训练曲线图，不需要重跑训练。
 - [scripts/preprocess_av1m_mouth_roi.py](scripts/preprocess_av1m_mouth_roi.py)：读取独立预处理 YAML，使用 dlib CUDA CNN face detector 做多进程、多卡分片 mouth ROI 预处理，并由主进程汇总进度和结果。
 - [scripts/train_avhubert_classifier.py](scripts/train_avhubert_classifier.py)：读取训练 YAML，按 `train.devices` 自动切换单卡或多卡 DDP，加载 frozen `AV-HuBERT` audio-visual backbone 和单层线性 probe，执行训练、验证和测试。
@@ -60,6 +62,7 @@ python scripts/preprocess_av1m_mouth_roi.py
 python scripts/cache_av1m_audio_features.py
 python scripts/train_avhubert_classifier.py
 python scripts/plot_training_summary.py --summary outputs/.../summary.json
+python scripts/inspect_mavos_dd_metadata.py --metadata-root dataset/MAVOS-DD-meta
 ```
 
 运行前需要确认以下资源已经就位：

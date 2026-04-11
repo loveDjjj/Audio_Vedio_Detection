@@ -10,6 +10,9 @@ PyYAML
 tqdm
 requests
 huggingface_hub
+pandas
+pyarrow
+datasets
 
 # Training
 torch
