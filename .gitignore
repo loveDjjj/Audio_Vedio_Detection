@@ -17,8 +17,13 @@
 !/resources/avhubert/.gitkeep
 /artifacts/*
 !/artifacts/.gitkeep
-/outputs/*
+/outputs/**
 !/outputs/.gitkeep
+!/outputs/
+!/outputs/**/
+!/outputs/**/*.yaml
+!/outputs/**/*.json
+!/outputs/**/*.png
 /third_party/
 
 # Python cache and tooling
