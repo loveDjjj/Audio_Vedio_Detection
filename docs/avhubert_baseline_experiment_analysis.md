@@ -1,53 +1,64 @@
-# AV-HuBERT Baseline Pilot Analysis
+# AV-HuBERT Baseline 实验报告
 
-> [!abstract]
-> 本文档基于 [[Initial Plan]]，整理当前已经完成的两类实验：
-> 1. `AV-Deepfake1M (AV1M)` 的 in-domain pilot baseline
-> 2. `MAVOS-DD` 英语小样本的 `open_set_model` pilot baseline
->
-> 目标是回答两个问题：
-> - 冻结 `AV-HuBERT` + 轻量线性头，是否已经足够构成一个强 baseline？
-> - 同一套框架迁移到更难、更开放的分布后，性能会如何变化？
+## 目录
 
-## 1. 与初步方案的对应关系
+- [摘要](#abstract)
+- [一、任务与实验设计](#task-design)
+- [二、实验配置](#config)
+- [三、实验结果](#results)
+- [四、结果分析](#analysis)
+- [五、结论](#conclusion)
 
-[[Initial Plan]] 中的核心判断有两条：
+<a id="abstract"></a>
+## 摘要
 
-1. 先做一个尽量简单的 SSR-DFD 风格 baseline：
-   - `frozen AV-HuBERT backbone`
-   - `Linear(1024, 1)` 分类头
-   - `log-sum-exp pooling`
-2. 先在相对直接的设置上建立参照，再迁移到更复杂、更开放的分布上观察泛化。
+本文根据 [[Initial Plan]]，围绕 <span style="color:#C00000"><strong>SSR-DFD 风格的 frozen AV-HuBERT linear probe baseline</strong></span>，完成了两组 pilot 实验：  
+第一组是在 <span style="color:#C00000"><strong>AV-Deepfake1M (AV1M)</strong></span> 上做 in-domain baseline；第二组是在 <span style="color:#C00000"><strong>MAVOS-DD English small</strong></span> 上做 `open_set_model` 条件下的 unseen-generator pilot。当前结果表明，<span style="color:#C00000"><strong>冻结 AV-HuBERT + 单层线性头</strong></span> 在 AV1M 上已经可以取得非常强的效果，`test_f1` 达到 <span style="color:#C00000"><strong>0.9895</strong></span>；而在更难的 MAVOS-DD 英语开放集小样本上，最好验证表现达到 <span style="color:#C00000"><strong>val_f1=0.7785</strong></span>，说明这一 baseline 仍然有效，但 open-set 条件明显更难。进一步比较 `10 / 50 / 100 epoch` 的结果可以看到，<span style="color:#C00000"><strong>增加训练轮数在 10 到 50 epoch 区间收益明显，但 50 到 100 epoch 已经进入边际收益递减区</strong></span>，因此后续重点不应再只是继续增大 epoch，而应转向更完整的数据协议、阈值校准和更严格的泛化评估。
 
-当前已经完成的工作与该计划的对应关系如下：
+<a id="task-design"></a>
+## 一、任务与实验设计
 
-| 计划项 | 当前状态 | 备注 |
-| --- | --- | --- |
-| AV-HuBERT + 简单分类头 baseline | 已完成 | 当前训练头为 frozen backbone + 单层线性 probe |
-| AV1M baseline 验证 | 已完成 pilot | 使用 `AV-Deepfake1M/val` 子集中的 `real.mp4` 和 `fake_video_fake_audio.mp4` |
-| MAVOS-DD 更复杂分布测试 | 已完成 pilot | 当前仅做英语小样本 + `open_set_model=true` 的 unseen-generator 测试 |
-| FAVC / 真正 cross-dataset 对齐 | 未完成 | 还未跑 FAVC，也未完成官方意义上的 cross-dataset protocol |
-| MVAD 扩展测试 | 未完成 | 目前尚未接入 |
+### 1. Baseline 思路
 
-> [!info]
-> 因此，当前最准确的表述不是“完整完成了初步方案”，而是：
-> **已经完成了第一阶段 baseline 的核心搭建与两组 pilot 实验，并拿到了可解释的初步结果。**
+本文使用的检测框架与 [[Initial Plan]] 中的第一阶段设计一致，核心是验证：
 
-## 2. 统一实验设定
+- 预训练 `AV-HuBERT (audio-visual)` 表征是否已经足够强
+- 在 backbone 全冻结时，仅训练轻量分类头，是否仍能在 deepfake detection 上取得有效结果
 
-所有当前实验都复用了同一个核心检测框架：
+整体结构保持为：
 
 | 模块 | 当前实现 |
 | --- | --- |
 | Backbone | 预训练 `AV-HuBERT (audio-visual)` |
-| 参数策略 | backbone 全冻结，仅训练分类头 |
+| 参数策略 | 冻结 backbone，仅训练线性分类头 |
 | 分类头 | `Linear(1024, 1)` |
-| 聚合方式 | frame-level logits 经 `logsumexp` 做 video-level pooling |
-| 输入 | `mouth ROI video + cached audio logfbank features` |
+| 聚合 | `log-sum-exp pooling` |
+| 输入 | `mouth ROI video + cached audio features` |
 | 损失 | `BCEWithLogitsLoss` |
-| 训练设备 | 8 卡 DDP (`devices=[0,1,2,3,4,5,6,7]`) |
 
-统一不变的关键训练参数：
+### 2. 当前实际使用的数据切片
+
+当前并未直接覆盖 [[Initial Plan]] 中提到的全部数据集，而是先完成两个 pilot：
+
+| 数据集 | 当前使用的数据切片 | 作用 |
+| --- | --- | --- |
+| AV1M | `AV-Deepfake1M/val` 中的 `real.mp4` 与 `fake_video_fake_audio.mp4` | 建立 in-domain 强 baseline |
+| MAVOS-DD | `English small`，其中 `train` 按 `1/5` 抽样，`val` 全量，`test` 为 `open_set_model=true` 的 `1/5` 抽样 | 观察 unseen-generator 条件下的初步泛化能力 |
+
+当前 MAVOS-DD 英语小样本的有效样本规模为：
+
+| Split | 原始 split 数量 | 预处理后可用样本数 |
+| --- | ---: | ---: |
+| Train | `1277` | `1237` |
+| Val | `1079` | `1036` |
+| Test | `1590` | `1477` |
+
+> 这里的 MAVOS-DD 实验是 <span style="color:#C00000"><strong>English-only + open_set_model pilot</strong></span>，不是完整的 MAVOS-DD 全量 benchmark。
+
+<a id="config"></a>
+## 二、实验配置
+
+三个数据集实验共享的核心训练参数如下：
 
 | 参数 | 数值 |
 | --- | --- |
@@ -57,137 +68,24 @@
 | `weight_decay` | `1e-4` |
 | `grad_clip_norm` | `5.0` |
 | `amp` | `false` |
+| 训练方式 | 8 卡 DDP |
 
-## 3. 数据集与当前实际使用的数据切片
+本次实际对比的 run 配置如下：
 
-### 3.1 AV-Deepfake1M (AV1M)
+| 实验 | 输出目录 | Epoch | Batch Size | Devices |
+| --- | --- | ---: | ---: | --- |
+| AV1M baseline | [20260411-040113](/root/shared-nvme/Audio_Vedio_Detection/outputs/avhubert/av1m_val_real_fullfake/20260411-040113) | `10` | `4` | `8 GPUs` |
+| MAVOS Run A | [20260412-051856](/root/shared-nvme/Audio_Vedio_Detection/outputs/avhubert/mavos_dd_english_small/20260412-051856) | `10` | `8` | `8 GPUs` |
+| MAVOS Run B | [20260412-052419](/root/shared-nvme/Audio_Vedio_Detection/outputs/avhubert/mavos_dd_english_small/20260412-052419) | `50` | `4` | `8 GPUs` |
+| MAVOS Run C | [20260412-054048](/root/shared-nvme/Audio_Vedio_Detection/outputs/avhubert/mavos_dd_english_small/20260412-054048) | `100` | `4` | `8 GPUs` |
 
-当前 AV1M 实验并没有覆盖整个 `AV-Deepfake1M`，而是使用了仓库内已经准备好的 `val` 子集，并进一步只保留：
+<a id="results"></a>
+## 三、实验结果
 
-- `real.mp4`
-- `fake_video_fake_audio.mp4`
-
-对应训练输出目录：
-- [[outputs/avhubert/av1m_val_real_fullfake/20260411-040113]]
-
-实际进入训练链的样本规模：
-
-| Split | 可用样本数 |
-| --- | ---: |
-| Train | `22996` |
-| Val | `2874` |
-| Test | `2874` |
-
-补充说明：
-- 该结果对应的是 **in-domain pilot**，不是严格 cross-dataset 评测。
-- 当前 `AV1M` split 仍带有“同一原始来源分布内随机切分”的性质，因此结果应理解为“当前仓库协议下的高性能 baseline”，而不是论文级严格泛化结论。
-
-### 3.2 MAVOS-DD English Small
-
-出于数据规模和试验成本考虑，当前对 `MAVOS-DD` 只做了英语小样本 pilot：
-
-- 训练集：英语 `train` split 按生成器分层抽样 `1/5`
-- 验证集：英语 `validation` 全量
-- 测试集：英语 `test` 中 `open_set_model=true` 按生成器分层抽样 `1/5`
-
-这意味着当前 MAVOS-DD 实验重点不是“多语言泛化”，而是：
-
-> **英语条件下，对未见生成器 / unseen model 的初步泛化能力。**
-
-对应训练输出目录：
-- [[outputs/avhubert/mavos_dd_english_small/20260412-051856]]
-- [[outputs/avhubert/mavos_dd_english_small/20260412-052419]]
-- [[outputs/avhubert/mavos_dd_english_small/20260412-054048]]
-
-当前 split 规模与有效样本规模如下：
-
-| Split | Split 原始样本数 | 经过 mouth ROI 后可用样本数 |
-| --- | ---: | ---: |
-| Train | `1277` | `1237` |
-| Val | `1079` | `1036` |
-| Test | `1590` | `1477` |
-
-预处理失败的主要原因：
-- `no_landmarks`: `193`
-- `read_video_failed`: `3`
-
-测试集生成器组成（当前 pilot）：
-
-| Generator | 样本数 |
-| --- | ---: |
-| `hififace` | `422` |
-| `roop` | `291` |
-| `sonic` | `67` |
-| `real` | `810` |
-
-> [!warning]
-> 当前 MAVOS-DD pilot 不是“完整的 MAVOS-DD out-of-model benchmark”，而是：
-> **English-only + open_set_model small pilot**。
-
-## 4. 当前已完成的实验配置
-
-### 4.1 AV1M baseline
-
-来源配置：
-- [[outputs/avhubert/av1m_val_real_fullfake/20260411-040113/config.yaml]]
-
-关键参数：
-
-| 项目 | 数值 |
-| --- | --- |
-| `epochs` | `10` |
-| `batch_size` | `4` |
-| `num_workers` | `16` |
-| `devices` | `8 GPUs` |
-
-### 4.2 MAVOS-DD English Small：Run A
-
-来源配置：
-- [[outputs/avhubert/mavos_dd_english_small/20260412-051856/config.yaml]]
-
-关键参数：
-
-| 项目 | 数值 |
-| --- | --- |
-| `epochs` | `10` |
-| `batch_size` | `8` |
-| `num_workers` | `16` |
-| `devices` | `8 GPUs` |
-
-### 4.3 MAVOS-DD English Small：Run B
-
-来源配置：
-- [[outputs/avhubert/mavos_dd_english_small/20260412-052419/config.yaml]]
-
-关键参数：
-
-| 项目 | 数值 |
-| --- | --- |
-| `epochs` | `50` |
-| `batch_size` | `4` |
-| `num_workers` | `16` |
-| `devices` | `8 GPUs` |
-
-### 4.4 MAVOS-DD English Small：Run C
-
-来源配置：
-- [[outputs/avhubert/mavos_dd_english_small/20260412-054048/config.yaml]]
-
-关键参数：
-
-| 项目 | 数值 |
-| --- | --- |
-| `epochs` | `100` |
-| `batch_size` | `4` |
-| `num_workers` | `16` |
-| `devices` | `8 GPUs` |
-
-## 5. 结果汇总
-
-### 5.1 AV1M baseline 结果
+### 1. AV1M baseline 结果
 
 来源：
-- [[outputs/avhubert/av1m_val_real_fullfake/20260411-040113/summary.json]]
+- [summary.json](/root/shared-nvme/Audio_Vedio_Detection/outputs/avhubert/av1m_val_real_fullfake/20260411-040113/summary.json)
 
 | 指标 | 数值 |
 | --- | ---: |
@@ -199,211 +97,104 @@
 | `test_f1` | `0.9895` |
 | `test_loss` | `0.0395` |
 
-曲线：
+![](../outputs/avhubert/av1m_val_real_fullfake/20260411-040113/training_curves.png)
 
-![[outputs/avhubert/av1m_val_real_fullfake/20260411-040113/training_curves.png]]
+图 1：AV1M in-domain baseline 训练曲线，配置为 `epochs=10`、`batch_size=4`、`8 GPUs`。该图对应 [20260411-040113](/root/shared-nvme/Audio_Vedio_Detection/outputs/avhubert/av1m_val_real_fullfake/20260411-040113)，可见在当前 AV1M 切片上模型很快收敛，`10 epoch` 已足够达到稳定高性能。
 
-解读：
-- 该结果非常高，说明 **冻结 AV-HuBERT + 线性头** 在当前 AV1M in-domain 设置下已经足够强。
-- 训练和验证曲线收敛很快，`10 epoch` 已足够。
-- 这与 [[Initial Plan]] 中“AV-HuBERT 作为强 baseline”的判断是一致的。
+### 2. MAVOS-DD English small 结果对比
 
-但这里必须加一个保留意见：
+来源：
+- [20260412-051856/summary.json](/root/shared-nvme/Audio_Vedio_Detection/outputs/avhubert/mavos_dd_english_small/20260412-051856/summary.json)
+- [20260412-052419/summary.json](/root/shared-nvme/Audio_Vedio_Detection/outputs/avhubert/mavos_dd_english_small/20260412-052419/summary.json)
+- [20260412-054048/summary.json](/root/shared-nvme/Audio_Vedio_Detection/outputs/avhubert/mavos_dd_english_small/20260412-054048/summary.json)
 
-> [!warning]
-> 当前 AV1M 结果更适合解释为“当前仓库协议下的强 in-domain baseline”，而不是严格论文级 cross-dataset 结论。
-
-### 5.2 MAVOS-DD English Small 结果对比
-
-结果来源：
-- [[outputs/avhubert/mavos_dd_english_small/20260412-051856/summary.json]]
-- [[outputs/avhubert/mavos_dd_english_small/20260412-052419/summary.json]]
-- [[outputs/avhubert/mavos_dd_english_small/20260412-054048/summary.json]]
-
-| Run | Epochs | Batch Size | Best Epoch | Best Val F1 | Test Acc | Test Precision | Test Recall | Test F1 | Test Loss |
+| Run | Epoch | Batch | Best Epoch | Best Val F1 | Test Acc | Test Precision | Test Recall | Test F1 | Test Loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `20260412-051856` | `10` | `8` | `10` | `0.7072` | `0.6405` | `0.6568` | `0.9529` | `0.7776` | `0.8898` |
 | `20260412-052419` | `50` | `4` | `48` | `0.7579` | `0.6655` | `0.7503` | `0.7387` | `0.7445` | `0.6484` |
 | `20260412-054048` | `100` | `4` | `99` | `0.7785` | `0.6689` | `0.7780` | `0.6967` | `0.7351` | `0.6812` |
 
-#### Run A：10 epoch / batch size 8
+![](../outputs/avhubert/mavos_dd_english_small/20260412-051856/training_curves.png)
 
-曲线：
+图 2：MAVOS-DD English small，Run A 的训练曲线，配置为 `epochs=10`、`batch_size=8`、`8 GPUs`。该图对应 [20260412-051856](/root/shared-nvme/Audio_Vedio_Detection/outputs/avhubert/mavos_dd_english_small/20260412-051856)，主要用于观察短训练轮数下的快速 baseline 表现。
 
-![[outputs/avhubert/mavos_dd_english_small/20260412-051856/training_curves.png]]
+![](../outputs/avhubert/mavos_dd_english_small/20260412-052419/training_curves.png)
 
-解读：
-- 训练明显不足。
-- 该 run 的 test `F1` 虽然数值高于后两个 run，但它的预测行为偏“几乎都判 fake”：
-  - `recall` 很高：`0.9529`
-  - `tn = 18`
-  - `fp = 486`
-- 这更像是一个 **偏塌缩、阈值偏置明显** 的解，而不是稳定的 open-set detector。
+图 3：MAVOS-DD English small，Run B 的训练曲线，配置为 `epochs=50`、`batch_size=4`、`8 GPUs`。该图对应 [20260412-052419](/root/shared-nvme/Audio_Vedio_Detection/outputs/avhubert/mavos_dd_english_small/20260412-052419)，可以看到相比 10 epoch，验证集指标有明显提升。
 
-#### Run B：50 epoch / batch size 4
+![](../outputs/avhubert/mavos_dd_english_small/20260412-054048/training_curves.png)
 
-曲线：
+图 4：MAVOS-DD English small，Run C 的训练曲线，配置为 `epochs=100`、`batch_size=4`、`8 GPUs`。该图对应 [20260412-054048](/root/shared-nvme/Audio_Vedio_Detection/outputs/avhubert/mavos_dd_english_small/20260412-054048)，显示模型在更长训练下继续收敛，但后期收益已明显趋缓。
 
-![[outputs/avhubert/mavos_dd_english_small/20260412-052419/training_curves.png]]
+<a id="analysis"></a>
+## 四、结果分析
 
-解读：
-- 这是第一个比较稳定、可解释的 MAVOS-DD baseline。
-- `val_f1` 从 `0.69` 左右持续提升到 `0.758`。
-- test 的 precision / recall 比较均衡：
-  - `precision = 0.7503`
-  - `recall = 0.7387`
-- 从 open-set pilot 的角度看，这个 run 比 Run A 更可信。
+### 1. Frozen AV-HuBERT baseline 是否成立
 
-#### Run C：100 epoch / batch size 4
+结论是 <span style="color:#C00000"><strong>成立</strong></span>。
 
-曲线：
+证据很直接：
+- 在 AV1M in-domain pilot 上，`test_f1 = 0.9895`
+- 在 MAVOS-DD English small open-set pilot 上，最好验证表现达到 `0.7785`
 
-![[outputs/avhubert/mavos_dd_english_small/20260412-054048/training_curves.png]]
+这说明冻结的自监督 `AV-HuBERT` 表征本身已经携带了足够强的判别信息，单层线性头就可以构成一个有解释力的 baseline。
 
-解读：
-- `best_val_f1` 提升到了当前最高：`0.7785`
-- `test_accuracy` 也是三组 MAVOS run 中最高：`0.6689`
-- 但是 `test_f1` 下降到了 `0.7351`
+### 2. Open-set model 是否明显更难
 
-这说明：
-- `50 -> 100 epoch` 的确带来了更充分的收敛
-- 但模型开始变得更保守：
-  - `precision` 上升
-  - `recall` 下降
-- 也就是说，当前结果已经进入 **阈值敏感、收益递减的后期收敛区**
+结论是 <span style="color:#C00000"><strong>明显更难</strong></span>。
 
-> [!summary]
-> 就“训练是否充分”而言，`100 epoch` 明显优于 `10 epoch`，也略优于 `50 epoch`。
-> 但就“是否值得继续无限增大 epoch”而言，答案是否定的：收益已经开始明显变小。
-
-## 6. 对初始猜想的检验
-
-### 猜想 1：冻结 AV-HuBERT + 简单线性头可以构成一个强 baseline
-
-**结论：成立。**
-
-证据：
-- AV1M pilot 中，`test_f1 = 0.9895`
-- MAVOS-DD English small pilot 中，即使面对 unseen generators，依然能稳定达到：
-  - `val_f1 ≈ 0.76 ~ 0.78`
-  - `test_acc ≈ 0.66 ~ 0.67`
-
-解释：
-- 在容易的 in-domain 条件下，这个 baseline 已经非常强。
-- 在更难的 open-set 条件下，它虽不再接近“饱和”，但仍然能学到明显高于随机的有效判别能力。
-
-### 猜想 2：同一套框架可以迁移到更复杂、更开放的数据分布
-
-**结论：成立。**
-
-证据：
-- 从 `AV1M` 迁移到 `MAVOS-DD`，模型结构没有变化，只做了数据适配。
-- 预处理、音频缓存、训练、绘图链路都能复用。
-- 说明工程路径是可迁移的。
-
-### 猜想 3：开放集 / 未见生成器场景会比 AV1M in-domain 明显更难
-
-**结论：成立，而且差异很明显。**
-
-对比：
+从结果对比可以看到：
 - AV1M pilot：`test_f1 = 0.9895`
-- MAVOS-DD English small：`test_f1 ≈ 0.735 ~ 0.745`
+- MAVOS-DD English small：最好 `test_f1` 约在 `0.735 ~ 0.745`
 
-解释：
-- AV1M 当前设置更接近同分布二分类
-- MAVOS-DD 当前设置是英语 + unseen model pilot
-- 指标大幅下降，说明 open-set generator generalization 的难度确实更高
+这说明当分布从“较接近同分布的 AV1M pilot”迁移到“英语 unseen-generator pilot”后，性能出现了显著下降。这个现象和 [[Initial Plan]] 中“第二阶段更强调泛化压力”的判断一致。
 
-### 猜想 4：继续加大 epoch 会持续明显提升效果
+### 3. Epoch 增大是否还值得继续
 
-**结论：不完全成立。**
+结论是 <span style="color:#C00000"><strong>10 到 50 epoch 很值得，50 到 100 epoch 收益已经明显变小</strong></span>。
 
-证据：
-- `10 -> 50 epoch`：收益明显
-- `50 -> 100 epoch`：仍有提升，但幅度已经明显变小
-- `best_epoch = 99` 说明当前还没完全“提前停住”，但 improvement 已接近平台区
+具体表现：
+- `10 -> 50 epoch`
+  - `best_val_f1: 0.7072 -> 0.7579`
+  - 收益明显
+- `50 -> 100 epoch`
+  - `best_val_f1: 0.7579 -> 0.7785`
+  - 有收益，但已经接近平台区
 
-解释：
-- 训练轮数不是当前最主要的瓶颈了
-- 后续更值得投入的方向可能是：
+同时，`100 epoch` 虽然取得了最高的 `best_val_f1`，但 test `F1` 没有继续提升，反而表现出更保守的预测风格：
+- `precision` 上升
+- `recall` 下降
+
+因此当前更合理的判断是：
+- 单纯继续无上限增大 epoch 的价值已经不大
+- 后续更值得尝试的是：
   - 阈值校准
-  - 学习率 / 正则化策略
-  - 更严格的评估 protocol
-  - 更大、更完整的 MAVOS-DD 子集
+  - 更完整的 MAVOS-DD 测试协议
+  - 更大范围的数据切片
 
-## 7. 当前阶段的总体结论
+<a id="conclusion"></a>
+## 五、结论
 
-> [!success]
-> 当前实验已经足以支持一个阶段性结论：
-> **SSR-DFD 风格的 frozen AV-HuBERT linear probe 是一个成立且有解释力的 baseline。**
+结合 [[Initial Plan]]，当前实验可以给出一个阶段性结论：
 
-但这个结论需要分两层理解：
+1. <span style="color:#C00000"><strong>已验证</strong></span>：  
+   frozen `AV-HuBERT + linear probe` 是一个成立且足够强的 baseline。
 
-### 在 AV1M 上
-- baseline 很强
-- 说明自监督 AV-HuBERT 表征本身就带有很强的 deepfake 相关信息
+2. <span style="color:#C00000"><strong>已验证</strong></span>：  
+   同一套框架可以从 AV1M 平滑迁移到 MAVOS-DD English small，并在 unseen-generator 条件下保持可用表现。
 
-### 在 MAVOS-DD English small 上
-- baseline 仍然可用
-- 但性能显著下降
-- 说明 open-set / unseen generator 条件下，仅靠 frozen representation + 线性头还不够“轻松”
+3. <span style="color:#C00000"><strong>已验证</strong></span>：  
+   open-set / unseen model 条件明显比 AV1M 当前 in-domain pilot 更难。
 
-这正好符合 [[Initial Plan]] 的整体逻辑：
+4. <span style="color:#C00000"><strong>部分验证</strong></span>：  
+   增大训练轮数确实有帮助，但收益主要集中在 `10 -> 50 epoch`，到 `100 epoch` 已经进入边际收益递减区。
 
-1. 先建立一个简单而强的 baseline
-2. 再把它推到更难的分布上
-3. 观察性能落差，从而判断后续是否有必要引入更复杂结构
+5. <span style="color:#C00000"><strong>尚未完成</strong></span>：  
+   当前还没有完成：
+   - FAVC / AV1M 的严格 cross-dataset 对齐
+   - MAVOS-DD 全量 out-of-model benchmark
+   - MVAD 扩展实验
 
-当前结果已经给出了明确答案：
+因此，当前最准确的总结是：
 
-> [!note]
-> **需要。**
-> 至少在更开放的 MAVOS-DD setting 下，后续继续做更完整数据、阈值校准、甚至更强 head / 更严格 split protocol 都是有必要的。
-
-## 8. 目前还不能下的结论
-
-以下结论目前仍然**不能**直接声称已经完成：
-
-- 还不能说已经完成 `FAVC / AV1M` 的严格 cross-dataset 对齐
-- 还不能说已经完成 `MAVOS-DD` 全量的 out-of-model benchmark
-- 还不能说已经完成 `MVAD` 上的多生成器扩展测试
-- 还不能把当前 AV1M pilot 直接当作论文级严格泛化结果
-
-## 9. 下一步建议
-
-### 建议 1：固定当前 baseline 作为参照
-
-建议保留以下两个 run 作为当前阶段参照：
-
-- AV1M:
-  - [[outputs/avhubert/av1m_val_real_fullfake/20260411-040113]]
-- MAVOS-DD:
-  - [[outputs/avhubert/mavos_dd_english_small/20260412-054048]]
-
-理由：
-- 前者代表“当前仓库协议下的强 in-domain baseline”
-- 后者代表“当前英语 open_set_model pilot 下的最佳验证表现”
-
-### 建议 2：MAVOS-DD 不再继续单纯增大 epoch
-
-更合理的后续方向是：
-- 加 early stopping
-- 做 validation-based threshold tuning
-- 补充 `closed-set model` vs `open-set model` 对比
-- 扩展到更完整的英语 test，甚至更多语言
-
-### 建议 3：如果要做更干净的“多生成器效果”分析
-
-最好进一步区分：
-- `audio_fake`
-- `video_fake`
-- `audio_generative_method`
-- `generative_method`
-
-因为 MAVOS-DD 本身是多模态伪造数据集，当前 pilot 不是纯视觉生成器比较。
-
-## 10. 结论一句话版
-
-> [!quote]
-> 当前实验说明：  
-> **冻结 AV-HuBERT + 线性 probe 的简单 baseline 在 AV1M 上已经非常强，在 MAVOS-DD 英语 open-set model pilot 上也具备可用的泛化能力；但开放集场景明显更难，后续研究重点不应再只是增加训练 epoch，而应转向更严格的评估协议、阈值校准和更复杂分布上的扩展验证。**
+> <span style="color:#C00000"><strong>我们已经完成了一个可信的 AV-HuBERT baseline pilot：它在 AV1M 上非常强，在 MAVOS-DD English small 的 open-set model 条件下也具备可用的泛化能力；但开放集场景显著更难，后续工作的重点不应只是继续增加 epoch，而应转向更完整的评估协议和更复杂分布上的验证。</strong></span>
