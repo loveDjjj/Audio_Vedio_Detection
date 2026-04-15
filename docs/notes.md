@@ -2,29 +2,29 @@
 
 ## 需求
 
-为 FakeAVCeleb 设计独立训练分支，只接入 `dataset/FakeAVCeleb/RealVideo-RealAudio` 与 `dataset/FakeAVCeleb/FakeVideo-FakeAudio`，采用随机视频切分，并保持与当前 AV-HuBERT 流程兼容。
+根据已批准的 FakeAVCeleb 接入设计，编写可执行的实现计划，覆盖 split builder、FakeAVCeleb 专用 YAML、wrapper、生成的 split 工件、测试与文档更新。
 
 ## 修改文件
 
-- docs/superpowers/specs/2026-04-16-fakeavceleb-integration-design.md
+- docs/superpowers/plans/2026-04-16-fakeavceleb-independent-training-branch.md
 - docs/notes.md
 - docs/logs/2026-04.md
 
 ## 修改内容
 
-- 新增 FakeAVCeleb 独立训练分支设计文档，明确数据范围、标签映射、1:1 平衡采样、随机视频切分、CSV 字段、配置文件与脚本增补方案。
-- 记录本地 `meta_data.csv` 的尾部空列表头问题，并要求 split builder 使用显式列映射解析。
-- 明确首版不引入 `RealVideo-FakeAudio`、`FakeVideo-RealAudio`、不混训，也不修改当前 trainer 的损失函数与采样器。
+- 新增 FakeAVCeleb 独立训练分支实现计划文档，拆分为 split builder、配置与 wrapper、生成 split 与文档更新三组任务。
+- 在计划中明确将使用 `src/data/fakeavceleb_subset.py` 作为可测试的元数据解析与采样模块，并新增 `tests/test_fakeavceleb_subset.py` 与 `tests/test_fakeavceleb_wrappers.py`。
+- 同步更新当前 notes 与 2026-04 月志，记录本次计划文档产出与后续执行入口。
 
 ## 验证
 
 ```bash
-Get-Content docs/superpowers/specs/2026-04-16-fakeavceleb-integration-design.md
+Get-Content docs/superpowers/plans/2026-04-16-fakeavceleb-independent-training-branch.md
 ```
 
-结果：通过，设计文档已写入仓库，可用于后续评审与实现计划。
+结果：通过，实现计划文档已写入仓库，可直接进入执行阶段。
 
 ## Git
 
 - branch: `main`
-- commit: `git commit -m "docs: add fakeavceleb integration design spec"`
+- commit: `git commit -m "docs: add fakeavceleb implementation plan"`
