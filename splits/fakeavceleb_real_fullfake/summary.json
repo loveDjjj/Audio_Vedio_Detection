@@ -1,0 +1,67 @@
+{
+  "dataset": "FakeAVCeleb",
+  "selection": [
+    "RealVideo-RealAudio",
+    "FakeVideo-FakeAudio"
+  ],
+  "split_strategy": "random_video_level",
+  "seed": 42,
+  "source_videos": 11357,
+  "selected_videos": 1000,
+  "source_labels": {
+    "fake": 10857,
+    "real": 500
+  },
+  "source_fake_methods": {
+    "faceswap-wav2lip": 2717,
+    "fsgan-wav2lip": 3553,
+    "wav2lip": 4587
+  },
+  "selected_labels": {
+    "fake": 500,
+    "real": 500
+  },
+  "selected_fake_methods": {
+    "faceswap-wav2lip": 125,
+    "fsgan-wav2lip": 164,
+    "wav2lip": 211
+  },
+  "splits": {
+    "train": {
+      "videos": 800,
+      "labels": {
+        "fake": 407,
+        "real": 393
+      },
+      "methods": {
+        "faceswap-wav2lip": 106,
+        "fsgan-wav2lip": 136,
+        "wav2lip": 165
+      }
+    },
+    "val": {
+      "videos": 100,
+      "labels": {
+        "fake": 41,
+        "real": 59
+      },
+      "methods": {
+        "wav2lip": 22,
+        "faceswap-wav2lip": 7,
+        "fsgan-wav2lip": 12
+      }
+    },
+    "test": {
+      "videos": 100,
+      "labels": {
+        "fake": 52,
+        "real": 48
+      },
+      "methods": {
+        "fsgan-wav2lip": 16,
+        "faceswap-wav2lip": 12,
+        "wav2lip": 24
+      }
+    }
+  }
+}
