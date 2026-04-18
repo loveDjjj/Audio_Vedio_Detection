@@ -1,34 +1,46 @@
 {
   "dataset": "AV-Deepfake1M",
-  "source_split": "val",
+  "source_splits": [
+    "train",
+    "val"
+  ],
   "selection": [
     "real.mp4",
     "fake_video_fake_audio.mp4"
   ],
-  "split_strategy": "random_video_level",
+  "split_strategy": "official_train_plus_val_clip_holdout",
   "seed": 42,
   "source_stats": {
-    "total_metadata_rows": 57340,
-    "real_rows": 14235,
-    "fullfake_rows": 14515,
-    "missing_video_files": 0,
-    "selected_videos": 28750
+    "train": {
+      "total_metadata_rows": 746180,
+      "real_rows": 186666,
+      "fullfake_rows": 186344,
+      "missing_video_files": 373010,
+      "selected_videos": 0
+    },
+    "val": {
+      "total_metadata_rows": 57340,
+      "real_rows": 14235,
+      "fullfake_rows": 14515,
+      "missing_video_files": 28750,
+      "selected_videos": 0
+    }
   },
   "splits": {
     "train": {
-      "videos": 23000,
-      "real_videos": 11408,
-      "fake_videos": 11592
+      "videos": 0,
+      "real_videos": 0,
+      "fake_videos": 0
     },
     "val": {
-      "videos": 2875,
-      "real_videos": 1437,
-      "fake_videos": 1438
+      "videos": 0,
+      "real_videos": 0,
+      "fake_videos": 0
     },
     "test": {
-      "videos": 2875,
-      "real_videos": 1390,
-      "fake_videos": 1485
+      "videos": 0,
+      "real_videos": 0,
+      "fake_videos": 0
     }
   }
 }

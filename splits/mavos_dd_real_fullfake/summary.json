@@ -1,49 +1,56 @@
 {
   "dataset": "MAVOS-DD",
-  "language": "english",
-  "train_ratio": 0.2,
-  "test_ratio": 0.2,
-  "seed": 42,
+  "selection": {
+    "real": {
+      "label": "real",
+      "audio_fake": false,
+      "video_fake": false
+    },
+    "fake": {
+      "label": "fake",
+      "audio_fake": true,
+      "video_fake": true
+    }
+  },
+  "split_strategy": "official_split",
+  "source_videos": 87038,
   "splits": {
     "train": {
-      "videos": 1277,
+      "videos": 11097,
       "labels": {
-        "fake": 638,
-        "real": 639
+        "fake": 800,
+        "real": 10297
       },
       "generative_methods": {
-        "echomimic": 49,
-        "real": 667,
-        "inswapper": 487,
-        "liveportrait": 27,
-        "memo": 47
+        "memo": 800,
+        "real": 10297
       }
     },
     "val": {
-      "videos": 1079,
+      "videos": 2015,
       "labels": {
-        "fake": 566,
-        "real": 513
+        "fake": 300,
+        "real": 1715
       },
       "generative_methods": {
-        "echomimic": 36,
-        "real": 563,
-        "inswapper": 397,
-        "liveportrait": 18,
-        "memo": 65
+        "memo": 300,
+        "real": 1715
       }
     },
     "test": {
-      "videos": 1590,
+      "videos": 29818,
       "labels": {
-        "fake": 1027,
-        "real": 563
+        "fake": 6273,
+        "real": 23545
       },
       "generative_methods": {
-        "hififace": 422,
-        "real": 810,
-        "roop": 291,
-        "sonic": 67
+        "echomimic": 1351,
+        "hififace": 1146,
+        "liveportrait": 1149,
+        "memo": 567,
+        "real": 23545,
+        "roop": 437,
+        "sonic": 1623
       }
     }
   }
