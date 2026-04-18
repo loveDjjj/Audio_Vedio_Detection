@@ -20,7 +20,7 @@ def parse_args() -> argparse.Namespace:
         description="Build MAVOS-DD official real/real vs fake/fake train/val/test CSV splits."
     )
     parser.add_argument("--metadata-root", type=Path, default=Path("/data/OneDay/MAVOS-DD"), help="Directory containing MAVOS-DD metadata.")
-    parser.add_argument("--output-dir", type=Path, default=Path("splits/mavos_dd_english_small"), help="Output directory for generated split CSVs.")
+    parser.add_argument("--output-dir", type=Path, default=Path("splits/mavos_dd_real_fullfake"), help="Output directory for generated split CSVs.")
     return parser.parse_args()
 
 

@@ -68,9 +68,9 @@ python dataset/download_av1m_meta.py
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
 conda activate oneday
-python dataset/build_av1m_val_real_fullfake_splits.py \
+python dataset/build_av1m_official_real_fullfake_splits.py \
   --root /data/OneDay/AV-Deepfake1M \
-  --output-dir splits/av1m_val_real_fullfake \
+  --output-dir splits/av1m_official_real_fullfake \
   --seed 42
 ```
 
@@ -104,14 +104,14 @@ python scripts/train_avhubert_classifier.py --config configs/avhubert_classifier
 cd ~/OneDay/Audio_Vedio_Detection
 conda activate oneday
 python scripts/plot_training_summary.py \
-  --summary outputs/avhubert/av1m_val_real_fullfake/<timestamp>/summary.json
+  --summary outputs/avhubert/av1m_official_real_fullfake/<timestamp>/summary.json
 ```
 
 ### 2.3 输出位置
 
-- split：`splits/av1m_val_real_fullfake/`
-- preprocess / audio cache：`artifacts/avhubert/av1m_val_real_fullfake/`
-- 训练输出：`outputs/avhubert/av1m_val_real_fullfake/<timestamp>/`
+- split：`splits/av1m_official_real_fullfake/`
+- preprocess / audio cache：`artifacts/avhubert/av1m_official_real_fullfake/`
+- 训练输出：`outputs/avhubert/av1m_official_real_fullfake/<timestamp>/`
 
 ## 3. FakeAVCeleb
 
@@ -188,7 +188,7 @@ python scripts/plot_training_summary.py \
 - 不再限制 `language`
 - 不再限制 `open_set_model`
 
-脚本和配置文件名仍保留 `english_small` 历史命名，但当前生成的是 MAVOS-DD `real/real vs fake/fake` 全量协议。
+当前 MAVOS-DD 相关入口、split、artifact 和 output 目录已经统一到 `real_fullfake` 命名。
 
 ### 4.2 命令顺序
 
@@ -205,9 +205,9 @@ python scripts/inspect_mavos_dd_metadata.py --metadata-root /data/OneDay/MAVOS-D
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
 conda activate oneday
-python dataset/build_mavos_dd_english_splits.py \
+python dataset/build_mavos_dd_real_fullfake_splits.py \
   --metadata-root /data/OneDay/MAVOS-DD \
-  --output-dir splits/mavos_dd_english_small
+  --output-dir splits/mavos_dd_real_fullfake
 ```
 
 如需补下载 split 引用到的视频文件：
@@ -216,7 +216,7 @@ python dataset/build_mavos_dd_english_splits.py \
 cd ~/OneDay/Audio_Vedio_Detection
 conda activate oneday
 python dataset/download_mavos_dd_selected_files.py \
-  --split-dir splits/mavos_dd_english_small \
+  --split-dir splits/mavos_dd_real_fullfake \
   --output-root /data/OneDay/MAVOS-DD
 ```
 
@@ -225,7 +225,7 @@ python dataset/download_mavos_dd_selected_files.py \
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
 conda activate avhubert
-python scripts/preprocess_mavos_dd_english_small.py
+python scripts/preprocess_mavos_dd_real_fullfake.py
 ```
 
 缓存音频特征：
@@ -233,7 +233,7 @@ python scripts/preprocess_mavos_dd_english_small.py
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
 conda activate oneday
-python scripts/cache_mavos_dd_english_small_audio_features.py
+python scripts/cache_mavos_dd_real_fullfake_audio_features.py
 ```
 
 启动训练和测试：
@@ -241,7 +241,7 @@ python scripts/cache_mavos_dd_english_small_audio_features.py
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
 conda activate oneday
-python scripts/train_mavos_dd_english_small.py
+python scripts/train_mavos_dd_real_fullfake.py
 ```
 
 绘制训练曲线：
@@ -249,15 +249,15 @@ python scripts/train_mavos_dd_english_small.py
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
 conda activate oneday
-python scripts/plot_mavos_dd_english_small.py \
-  --summary outputs/avhubert/mavos_dd_english_small/<timestamp>/summary.json
+python scripts/plot_mavos_dd_real_fullfake.py \
+  --summary outputs/avhubert/mavos_dd_real_fullfake/<timestamp>/summary.json
 ```
 
 ### 4.3 输出位置
 
-- split：`splits/mavos_dd_english_small/`
-- preprocess / audio cache：`artifacts/avhubert/mavos_dd_english_small/`
-- 训练输出：`outputs/avhubert/mavos_dd_english_small/<timestamp>/`
+- split：`splits/mavos_dd_real_fullfake/`
+- preprocess / audio cache：`artifacts/avhubert/mavos_dd_real_fullfake/`
+- 训练输出：`outputs/avhubert/mavos_dd_real_fullfake/<timestamp>/`
 
 ## 5. 输出文件说明
 
@@ -282,4 +282,4 @@ python scripts/plot_mavos_dd_english_small.py \
   - AV1M：官方 `train + val` 下的 `real.mp4` vs `fake_video_fake_audio.mp4`
   - FakeAVCeleb：`RealVideo-RealAudio` vs `FakeVideo-FakeAudio` 全量样本
   - MAVOS-DD：官方 split 下的全语言 `real/real` vs `fake/fake`
-- 目录名和部分脚本名沿用了历史命名，例如 `av1m_val_real_fullfake`、`mavos_dd_english_small`，但当前协议内容已经切换到全量版本
+- 当前命名已统一到新的全量协议版本，例如 `av1m_official_real_fullfake`、`mavos_dd_real_fullfake`

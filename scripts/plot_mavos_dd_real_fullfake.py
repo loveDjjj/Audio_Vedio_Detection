@@ -13,7 +13,7 @@ from src.visualization.training_curves import plot_training_summary
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Plot MAVOS-DD English small training curves from summary.json")
+    parser = argparse.ArgumentParser(description="Plot MAVOS-DD real/fullfake training curves from summary.json")
     parser.add_argument("--summary", type=Path, required=True, help="Path to summary.json")
     parser.add_argument("--output", type=Path, default=None, help="Optional output image path")
     return parser.parse_args()

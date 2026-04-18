@@ -38,7 +38,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("splits/av1m_val_real_fullfake"),
+        default=Path("splits/av1m_official_real_fullfake"),
         help="Directory for generated split files.",
     )
     parser.add_argument(

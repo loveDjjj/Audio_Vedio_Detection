@@ -1,16 +1,16 @@
-experiment_name: mavos_dd_english_small_avhubert
+experiment_name: mavos_dd_real_fullfake_avhubert
 
 paths:
   # Linux host data root lives under /data/OneDay.
   dataset_root: /data/OneDay/MAVOS-DD
   raw_video_root: /data/OneDay/MAVOS-DD
-  split_dir: splits/mavos_dd_english_small
-  artifact_root: artifacts/avhubert/mavos_dd_english_small
-  manifest_dir: artifacts/avhubert/mavos_dd_english_small/manifests
-  landmark_dir: artifacts/avhubert/mavos_dd_english_small/landmarks
-  mouth_roi_root: artifacts/avhubert/mavos_dd_english_small/mouth_roi
-  audio_feature_root: artifacts/avhubert/mavos_dd_english_small/audio_features
-  output_root: outputs/avhubert/mavos_dd_english_small
+  split_dir: splits/mavos_dd_real_fullfake
+  artifact_root: artifacts/avhubert/mavos_dd_real_fullfake
+  manifest_dir: artifacts/avhubert/mavos_dd_real_fullfake/manifests
+  landmark_dir: artifacts/avhubert/mavos_dd_real_fullfake/landmarks
+  mouth_roi_root: artifacts/avhubert/mavos_dd_real_fullfake/mouth_roi
+  audio_feature_root: artifacts/avhubert/mavos_dd_real_fullfake/audio_features
+  output_root: outputs/avhubert/mavos_dd_real_fullfake
   # Shared AV-HuBERT checkpoint is stored outside the repo under /data/OneDay/model.
   checkpoint_path: /data/OneDay/model/self_large_vox_433h.pt
   avhubert_repo: third_party/av_hubert

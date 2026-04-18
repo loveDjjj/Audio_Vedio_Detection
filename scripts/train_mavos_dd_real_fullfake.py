@@ -12,12 +12,12 @@ if str(PROJECT_ROOT) not in sys.path:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run MAVOS-DD English small training with the dedicated config.")
+    parser = argparse.ArgumentParser(description="Run MAVOS-DD real/fullfake training with the dedicated config.")
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/mavos_dd_english_small_classifier.yaml"),
-        help="Path to the MAVOS-DD English small training config.",
+        default=Path("configs/mavos_dd_real_fullfake_classifier.yaml"),
+        help="Path to the MAVOS-DD real/fullfake training config.",
     )
     return parser.parse_args()
 

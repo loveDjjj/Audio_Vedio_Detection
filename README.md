@@ -12,16 +12,16 @@ configs/
   avhubert_preprocess.yaml
   fakeavceleb_classifier.yaml
   fakeavceleb_preprocess.yaml
-  mavos_dd_english_small_classifier.yaml
-  mavos_dd_english_small_preprocess.yaml
+  mavos_dd_real_fullfake_classifier.yaml
+  mavos_dd_real_fullfake_preprocess.yaml
 dataset/
   AV-Deepfake1M/
   FakeAVCeleb/
   build_fakeavceleb_real_fullfake_splits.py
-  build_mavos_dd_english_splits.py
+  build_mavos_dd_real_fullfake_splits.py
   download_av1m_meta.py
   download_mavos_dd_selected_files.py
-  build_av1m_val_real_fullfake_splits.py
+  build_av1m_official_real_fullfake_splits.py
 model/
   self_large_vox_433h.pt
 scripts/
@@ -30,16 +30,16 @@ scripts/
   cache_fakeavceleb_audio_features.py
   inspect_mavos_dd_metadata.py
   plot_training_summary.py
-  plot_mavos_dd_english_small.py
+  plot_mavos_dd_real_fullfake.py
   preprocess_av1m_mouth_roi.py
   preprocess_fakeavceleb.py
-  preprocess_mavos_dd_english_small.py
+  preprocess_mavos_dd_real_fullfake.py
   train_avhubert_classifier.py
   train_fakeavceleb.py
-  train_mavos_dd_english_small.py
-  cache_mavos_dd_english_small_audio_features.py
+  train_mavos_dd_real_fullfake.py
+  cache_mavos_dd_real_fullfake_audio_features.py
 splits/
-  av1m_val_real_fullfake/
+  av1m_official_real_fullfake/
   fakeavceleb_real_fullfake/
 src/
   data/
@@ -60,12 +60,12 @@ outputs/
 - [configs/avhubert_preprocess.yaml](configs/avhubert_preprocess.yaml)：当前预处理配置，集中管理 mouth ROI 预处理路径、裁剪参数、多进程和多卡运行参数。
 - [configs/fakeavceleb_classifier.yaml](configs/fakeavceleb_classifier.yaml)：FakeAVCeleb `RealVideo-RealAudio` / `FakeVideo-FakeAudio` 独立训练配置，复用当前 AV-HuBERT 训练链并切换到 `fakeavceleb_real_fullfake` 路径。
 - [configs/fakeavceleb_preprocess.yaml](configs/fakeavceleb_preprocess.yaml)：FakeAVCeleb 独立预处理配置，复用当前 mouth ROI 预处理链并切换到 `fakeavceleb_real_fullfake` 路径。
-- [configs/mavos_dd_english_small_classifier.yaml](configs/mavos_dd_english_small_classifier.yaml)：MAVOS-DD 训练配置，当前按官方 split 保留全部 real/real 与 fake/fake 样本；文件名保留历史命名以兼容现有脚本路径。
-- [configs/mavos_dd_english_small_preprocess.yaml](configs/mavos_dd_english_small_preprocess.yaml)：MAVOS-DD 预处理配置，当前按官方 split 保留全部 real/real 与 fake/fake 样本；文件名保留历史命名以兼容现有脚本路径。
+- [configs/mavos_dd_real_fullfake_classifier.yaml](configs/mavos_dd_real_fullfake_classifier.yaml)：MAVOS-DD 训练配置，当前按官方 split 保留全部 real/real 与 fake/fake 样本。
+- [configs/mavos_dd_real_fullfake_preprocess.yaml](configs/mavos_dd_real_fullfake_preprocess.yaml)：MAVOS-DD 预处理配置，当前按官方 split 保留全部 real/real 与 fake/fake 样本。
 - [dataset/download_av1m_meta.py](dataset/download_av1m_meta.py)：下载 `AV-Deepfake1M` 的 `val` 分卷和 `val_metadata.json`，并调用 `7z` 解压；全量协议仍要求你提前准备好 `train/` 与 `train_metadata.json`。
-- [dataset/build_av1m_val_real_fullfake_splits.py](dataset/build_av1m_val_real_fullfake_splits.py)：从 `train_metadata.json` 和 `val_metadata.json` 中筛出 `real.mp4` 与 `fake_video_fake_audio.mp4`，保留官方 `train`，并将官方 `val` 按 clip 级随机切成 `val/test`。
+- [dataset/build_av1m_official_real_fullfake_splits.py](dataset/build_av1m_official_real_fullfake_splits.py)：从 `train_metadata.json` 和 `val_metadata.json` 中筛出 `real.mp4` 与 `fake_video_fake_audio.mp4`，保留官方 `train`，并将官方 `val` 按 clip 级随机切成 `val/test`。
 - [dataset/build_fakeavceleb_real_fullfake_splits.py](dataset/build_fakeavceleb_real_fullfake_splits.py)：从本地 FakeAVCeleb metadata 中筛出 `RealVideo-RealAudio` 和 `FakeVideo-FakeAudio`，保留全量样本并按 `label/method` 分层生成 `train/val/test` CSV。
-- [dataset/build_mavos_dd_english_splits.py](dataset/build_mavos_dd_english_splits.py)：从本地 MAVOS-DD metadata 中筛出官方 split 下全部 real/real 与 fake/fake 样本，生成 `train/val/test` CSV；脚本文件名保留历史命名以兼容现有入口。
+- [dataset/build_mavos_dd_real_fullfake_splits.py](dataset/build_mavos_dd_real_fullfake_splits.py)：从本地 MAVOS-DD metadata 中筛出官方 split 下全部 real/real 与 fake/fake 样本，生成 `train/val/test` CSV。
 - [dataset/download_mavos_dd_selected_files.py](dataset/download_mavos_dd_selected_files.py)：按当前 MAVOS-DD split CSV 中的 `relative_path` 下载被选中的视频文件。
 - [scripts/build_avhubert_manifests.py](scripts/build_avhubert_manifests.py)：把 split CSV 转成 AV-HuBERT 预处理用的 `*.list`。
 - [scripts/cache_av1m_audio_features.py](scripts/cache_av1m_audio_features.py)：按多进程方式离线提取 raw mp4 的 16kHz mono 音频 logfbank，并直接缓存为训练最终读取的 stacked `.npy` 特征文件。
@@ -76,10 +76,10 @@ outputs/
 - [scripts/preprocess_fakeavceleb.py](scripts/preprocess_fakeavceleb.py)：零参数入口，直接使用 `configs/fakeavceleb_preprocess.yaml` 预处理 FakeAVCeleb 独立分支。
 - [scripts/train_avhubert_classifier.py](scripts/train_avhubert_classifier.py)：读取训练 YAML，按 `train.devices` 自动切换单卡或多卡 DDP，加载 frozen `AV-HuBERT` audio-visual backbone 和单层线性 probe，执行训练、验证和测试。
 - [scripts/train_fakeavceleb.py](scripts/train_fakeavceleb.py)：零参数入口，直接使用 `configs/fakeavceleb_classifier.yaml` 训练 FakeAVCeleb 独立分支。
-- [scripts/preprocess_mavos_dd_english_small.py](scripts/preprocess_mavos_dd_english_small.py)：零参数入口，直接使用 `configs/mavos_dd_english_small_preprocess.yaml` 预处理 MAVOS-DD 当前 real/real vs fake/fake 全量协议。
-- [scripts/cache_mavos_dd_english_small_audio_features.py](scripts/cache_mavos_dd_english_small_audio_features.py)：零参数入口，直接使用 `configs/mavos_dd_english_small_classifier.yaml` 缓存 MAVOS-DD 当前 real/real vs fake/fake 全量协议音频特征。
-- [scripts/train_mavos_dd_english_small.py](scripts/train_mavos_dd_english_small.py)：零参数入口，直接使用 `configs/mavos_dd_english_small_classifier.yaml` 训练 MAVOS-DD 当前 real/real vs fake/fake 全量协议。
-- [scripts/plot_mavos_dd_english_small.py](scripts/plot_mavos_dd_english_small.py)：读取 MAVOS-DD 当前 real/real vs fake/fake 协议的 `summary.json` 并绘图。
+- [scripts/preprocess_mavos_dd_real_fullfake.py](scripts/preprocess_mavos_dd_real_fullfake.py)：零参数入口，直接使用 `configs/mavos_dd_real_fullfake_preprocess.yaml` 预处理 MAVOS-DD 当前 real/real vs fake/fake 全量协议。
+- [scripts/cache_mavos_dd_real_fullfake_audio_features.py](scripts/cache_mavos_dd_real_fullfake_audio_features.py)：零参数入口，直接使用 `configs/mavos_dd_real_fullfake_classifier.yaml` 缓存 MAVOS-DD 当前 real/real vs fake/fake 全量协议音频特征。
+- [scripts/train_mavos_dd_real_fullfake.py](scripts/train_mavos_dd_real_fullfake.py)：零参数入口，直接使用 `configs/mavos_dd_real_fullfake_classifier.yaml` 训练 MAVOS-DD 当前 real/real vs fake/fake 全量协议。
+- [scripts/plot_mavos_dd_real_fullfake.py](scripts/plot_mavos_dd_real_fullfake.py)：读取 MAVOS-DD 当前 real/real vs fake/fake 协议的 `summary.json` 并绘图。
 
 ## 运行方法
 
@@ -87,7 +87,7 @@ outputs/
 
 ```bash
 python dataset/download_av1m_meta.py
-python dataset/build_av1m_val_real_fullfake_splits.py
+python dataset/build_av1m_official_real_fullfake_splits.py
 python scripts/preprocess_av1m_mouth_roi.py
 python scripts/cache_av1m_audio_features.py
 python scripts/train_avhubert_classifier.py
@@ -97,12 +97,12 @@ python scripts/preprocess_fakeavceleb.py
 python scripts/cache_fakeavceleb_audio_features.py
 python scripts/train_fakeavceleb.py
 python scripts/inspect_mavos_dd_metadata.py --metadata-root /data/OneDay/MAVOS-DD
-python dataset/build_mavos_dd_english_splits.py
+python dataset/build_mavos_dd_real_fullfake_splits.py
 python dataset/download_mavos_dd_selected_files.py
-python scripts/preprocess_mavos_dd_english_small.py
-python scripts/cache_mavos_dd_english_small_audio_features.py
-python scripts/train_mavos_dd_english_small.py
-python scripts/plot_mavos_dd_english_small.py --summary outputs/avhubert/mavos_dd_english_small/.../summary.json
+python scripts/preprocess_mavos_dd_real_fullfake.py
+python scripts/cache_mavos_dd_real_fullfake_audio_features.py
+python scripts/train_mavos_dd_real_fullfake.py
+python scripts/plot_mavos_dd_real_fullfake.py --summary outputs/avhubert/mavos_dd_real_fullfake/.../summary.json
 ```
 
 运行前需要确认以下资源已经就位：
@@ -141,26 +141,26 @@ python scripts/plot_mavos_dd_english_small.py --summary outputs/avhubert/mavos_d
   - `paths`：FakeAVCeleb 独立分支的 split、mouth ROI、audio feature、output 路径
   - `audio_cache`：FakeAVCeleb 音频缓存的多进程配置
   - `train`：FakeAVCeleb 训练的单卡/多卡 DDP 配置
-- [configs/mavos_dd_english_small_preprocess.yaml](configs/mavos_dd_english_small_preprocess.yaml)
+- [configs/mavos_dd_real_fullfake_preprocess.yaml](configs/mavos_dd_real_fullfake_preprocess.yaml)
   - `paths`：MAVOS-DD 当前全量协议的 split、raw video、landmark、mouth ROI 路径
   - `preprocess`：沿用当前 mouth ROI 裁剪参数
   - `runtime`：预处理设备列表、worker 数和日志配置
-- [configs/mavos_dd_english_small_classifier.yaml](configs/mavos_dd_english_small_classifier.yaml)
+- [configs/mavos_dd_real_fullfake_classifier.yaml](configs/mavos_dd_real_fullfake_classifier.yaml)
   - `paths`：MAVOS-DD 当前全量协议的 split、mouth ROI、audio feature、output 路径
   - `audio_cache`：MAVOS-DD 当前全量协议音频缓存的多进程配置
   - `train`：MAVOS-DD 当前全量协议训练的单卡/多卡 DDP 配置
 
 ## 输出说明
 
-- `splits/av1m_val_real_fullfake/`：训练、验证、测试 CSV 及 split 统计
+- `splits/av1m_official_real_fullfake/`：训练、验证、测试 CSV 及 split 统计
 - `splits/fakeavceleb_real_fullfake/`：FakeAVCeleb `RealVideo-RealAudio` / `FakeVideo-FakeAudio` 的训练、验证、测试 CSV 及 split 统计
-- `artifacts/avhubert/av1m_val_real_fullfake/manifests/`：`train.list`、`val.list`、`test.list`、`all.list`
-- `artifacts/avhubert/av1m_val_real_fullfake/landmarks/`：关键点检测结果
-- `artifacts/avhubert/av1m_val_real_fullfake/mouth_roi/`：裁剪后的嘴部 ROI 视频
-- `artifacts/avhubert/av1m_val_real_fullfake/audio_features/`：离线缓存的音频 logfbank 特征
-- `artifacts/avhubert/av1m_val_real_fullfake/preprocess.log`：预处理主进程日志；worker 日志会写成 `preprocess_rank*.log`
-- `artifacts/avhubert/av1m_val_real_fullfake/audio_cache.log`：音频缓存脚本日志
-- `outputs/avhubert/av1m_val_real_fullfake/<timestamp>/`：训练输出目录，包含 `config.yaml`、`train.log`、`best_head.pt`、`last_head.pt`、`summary.json`、`training_curves.png`；多卡时其它 rank 会写 `train_rank*.log`
+- `artifacts/avhubert/av1m_official_real_fullfake/manifests/`：`train.list`、`val.list`、`test.list`、`all.list`
+- `artifacts/avhubert/av1m_official_real_fullfake/landmarks/`：关键点检测结果
+- `artifacts/avhubert/av1m_official_real_fullfake/mouth_roi/`：裁剪后的嘴部 ROI 视频
+- `artifacts/avhubert/av1m_official_real_fullfake/audio_features/`：离线缓存的音频 logfbank 特征
+- `artifacts/avhubert/av1m_official_real_fullfake/preprocess.log`：预处理主进程日志；worker 日志会写成 `preprocess_rank*.log`
+- `artifacts/avhubert/av1m_official_real_fullfake/audio_cache.log`：音频缓存脚本日志
+- `outputs/avhubert/av1m_official_real_fullfake/<timestamp>/`：训练输出目录，包含 `config.yaml`、`train.log`、`best_head.pt`、`last_head.pt`、`summary.json`、`training_curves.png`；多卡时其它 rank 会写 `train_rank*.log`
 - `artifacts/avhubert/fakeavceleb_real_fullfake/`：FakeAVCeleb 独立分支的 manifests、landmarks、mouth ROI、audio features 和日志
 - `outputs/avhubert/fakeavceleb_real_fullfake/<timestamp>/`：FakeAVCeleb 独立分支的训练输出目录
 

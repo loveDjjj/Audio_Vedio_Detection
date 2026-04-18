@@ -2,54 +2,66 @@
 
 ## 需求
 
-将三个数据集的 split 协议切换为当前仓库可支持的全量 `real/real vs fake/fake` 版本，并同步修正 AV1M 默认原始数据根路径与相关说明文档。
+将仍保留历史命名的目录名和脚本名统一切换到新的全量协议命名，并删除旧 split 目录下的数据集 CSV/summary 工件。
 
 ## 修改文件
 
-- dataset/build_av1m_val_real_fullfake_splits.py
-- dataset/build_fakeavceleb_real_fullfake_splits.py
-- dataset/build_mavos_dd_english_splits.py
-- src/data/fakeavceleb_subset.py
-- src/data/mavos_dd_subset.py
+- dataset/build_av1m_official_real_fullfake_splits.py
+- dataset/build_mavos_dd_real_fullfake_splits.py
+- dataset/download_mavos_dd_selected_files.py
 - configs/avhubert_classifier.yaml
 - configs/avhubert_preprocess.yaml
+- configs/mavos_dd_real_fullfake_classifier.yaml
+- configs/mavos_dd_real_fullfake_preprocess.yaml
+- scripts/preprocess_mavos_dd_real_fullfake.py
+- scripts/cache_mavos_dd_real_fullfake_audio_features.py
+- scripts/train_mavos_dd_real_fullfake.py
+- scripts/plot_mavos_dd_real_fullfake.py
+- splits/av1m_official_real_fullfake/train.csv
+- splits/av1m_official_real_fullfake/val.csv
+- splits/av1m_official_real_fullfake/test.csv
+- splits/av1m_official_real_fullfake/summary.json
+- splits/mavos_dd_real_fullfake/train.csv
+- splits/mavos_dd_real_fullfake/val.csv
+- splits/mavos_dd_real_fullfake/test.csv
+- splits/mavos_dd_real_fullfake/summary.json
 - README.md
 - docs/full_dataset_runbook.md
 - docs/notes.md
 - docs/logs/2026-04.md
-- tests/test_fakeavceleb_subset.py
-- tests/test_av1m_fullfake_splits.py
-- tests/test_mavos_dd_subset.py
 
 ## 修改内容
 
-- AV1M：split builder 改为同时读取 `train_metadata.json` 与 `val_metadata.json`，保留全部 `real.mp4` / `fake_video_fake_audio.mp4`；官方 `train` 直接作为训练集，官方 `val` 按 clip 级随机切成 `val/test`；`relative_path` 增加 `train/`、`val/` 前缀以匹配后续预处理与训练链路。
-- FakeAVCeleb：移除原先的 `1:1` fake 下采样，改为保留全部 `RealVideo-RealAudio` 与 `FakeVideo-FakeAudio` 样本，并按 `label/method` 分层切分 `train/val/test`。
-- MAVOS-DD：移除 `english-only`、`open_set_model` 和比例采样限制，改为保留官方 `train / validation / test` 下全部 `real/real` 与 `fake/fake` 样本；脚本和配置文件名保留历史命名以兼容现有入口。
-- 配置与文档：AV1M 默认 `raw_video_root` 改为 `/data/OneDay/AV-Deepfake1M`；README 与运行手册同步更新为新的全量协议说明，并补充 AV1M 仍需提前准备 `train/` 与 `train_metadata.json`。
-- 测试：更新现有 FakeAVCeleb 单测，并新增 AV1M / MAVOS-DD 的全量协议验证用例用于本地回归。
+- AV1M：将 split builder 文件名改为 `build_av1m_official_real_fullfake_splits.py`，并将默认 `split_dir / artifact_root / output_root` 统一切换到 `av1m_official_real_fullfake`。
+- MAVOS-DD：将 builder、配置和 wrapper 脚本从 `english_small` 命名统一改为 `real_fullfake`；同时把默认 `split_dir / artifact_root / output_root` 全部切到 `mavos_dd_real_fullfake`。
+- split 工件：将已提交的 AV1M 与 MAVOS-DD `train.csv`、`val.csv`、`test.csv`、`summary.json` 迁移到新目录，并删除旧目录中的同名文件。
+- 文档：README 和运行手册改为新的脚本名、目录名和命令，不再保留“历史命名沿用”的说明。
 
 ## 验证
 
 ```bash
-python -m unittest tests.test_av1m_fullfake_splits -v
-python -m unittest tests.test_fakeavceleb_subset -v
-python -m unittest tests.test_mavos_dd_subset -v
-python dataset/build_av1m_val_real_fullfake_splits.py --help
-python dataset/build_fakeavceleb_real_fullfake_splits.py --help
-python dataset/build_mavos_dd_english_splits.py --help
+python dataset/build_av1m_official_real_fullfake_splits.py --help
+python dataset/build_mavos_dd_real_fullfake_splits.py --help
+python scripts/train_mavos_dd_real_fullfake.py --help
+python scripts/plot_mavos_dd_real_fullfake.py --help
+python -m unittest tests.test_av1m_fullfake_splits tests.test_fakeavceleb_subset tests.test_mavos_dd_subset -v
 python - <<'PY'
 from pathlib import Path
 from src.utils.project import load_config
-for path in ("configs/avhubert_classifier.yaml", "configs/avhubert_preprocess.yaml"):
+for path in (
+    "configs/avhubert_classifier.yaml",
+    "configs/avhubert_preprocess.yaml",
+    "configs/mavos_dd_real_fullfake_classifier.yaml",
+    "configs/mavos_dd_real_fullfake_preprocess.yaml",
+):
     cfg = load_config(Path(path))
-    print(path, cfg["paths"]["raw_video_root"])
+    print(path, cfg["paths"]["split_dir"])
 PY
 ```
 
-结果：通过。三组针对性单测全部通过；三个 split builder 的 `--help` 均可正常启动；AV1M 训练与预处理配置解析出的 `raw_video_root` 均已切换到 `/data/OneDay/AV-Deepfake1M`。
+结果：待验证。
 
 ## Git
 
 - branch: `main`
-- commit: 待确认
+- commit: `refactor: rename full-protocol dataset entrypoints`
