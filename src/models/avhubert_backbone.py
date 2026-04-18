@@ -5,7 +5,7 @@ from typing import Any
 
 import torch
 import torch.nn as nn
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig, OmegaConf, open_dict
 
 from src.utils.avhubert_env import import_avhubert_modules
 
@@ -21,6 +21,32 @@ def _to_plain_dict(config: Any) -> dict:
 def _merge_with_schema_defaults(schema: Any, overrides: dict) -> DictConfig:
     defaults = OmegaConf.to_container(OmegaConf.structured(schema), resolve=False)
     return OmegaConf.merge(OmegaConf.create(defaults), OmegaConf.create(overrides))
+
+
+def _merge_model_config_defaults(hubert_module: Any, overrides: dict) -> DictConfig:
+    fairseq_wav2vec2 = __import__(
+        "fairseq.models.wav2vec.wav2vec2",
+        fromlist=["Wav2Vec2Config"],
+    )
+    schema_chain = []
+    if hasattr(fairseq_wav2vec2, "Wav2Vec2Config"):
+        schema_chain.append(fairseq_wav2vec2.Wav2Vec2Config)
+    schema_chain.append(hubert_module.AVHubertConfig)
+
+    merged = OmegaConf.create({})
+    for schema in schema_chain:
+        defaults = OmegaConf.to_container(OmegaConf.structured(schema), resolve=False)
+        merged = OmegaConf.merge(merged, OmegaConf.create(defaults))
+    merged = OmegaConf.merge(merged, OmegaConf.create(overrides))
+
+    # Older AV-HuBERT checkpoints predate newer fairseq positional-conv options.
+    # Fill them explicitly so model construction stays compatible across fairseq versions.
+    with open_dict(merged):
+        if OmegaConf.select(merged, "pos_conv_depth") is None:
+            merged["pos_conv_depth"] = 1
+        if OmegaConf.select(merged, "conv_pos_batch_norm") is None:
+            merged["conv_pos_batch_norm"] = False
+    return merged
 
 
 def _resolve_checkpoint_configs(state: dict) -> dict:
@@ -117,10 +143,7 @@ class AVHubertBackbone(nn.Module):
             hubert_pretraining_module.AVHubertPretrainingConfig,
             resolved["task_cfg"],
         )
-        model_cfg = _merge_with_schema_defaults(
-            hubert_module.AVHubertConfig,
-            resolved["model_cfg"],
-        )
+        model_cfg = _merge_model_config_defaults(hubert_module, resolved["model_cfg"])
         if "input_modality" in resolved["task_cfg"]:
             model_cfg.input_modality = resolved["task_cfg"]["input_modality"]
         model = hubert_module.AVHubertModel(model_cfg, task_cfg, dictionaries=[None])

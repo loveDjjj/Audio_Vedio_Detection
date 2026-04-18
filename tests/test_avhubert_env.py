@@ -1,14 +1,16 @@
 from pathlib import Path
 import sys
 import unittest
+from dataclasses import dataclass
 from unittest import mock
 
 from src.utils.avhubert_env import import_avhubert_modules
 
 try:
-    from src.models.avhubert_backbone import load_torch_checkpoint
+    from src.models.avhubert_backbone import load_torch_checkpoint, _merge_model_config_defaults
 except ModuleNotFoundError as exc:  # pragma: no cover - local env may not have torch installed
     load_torch_checkpoint = None
+    _merge_model_config_defaults = None
     IMPORT_ERROR = exc
 else:
     IMPORT_ERROR = None
@@ -65,6 +67,33 @@ class AVHubertEnvTest(unittest.TestCase):
                 map_location="cpu",
             ),
         )
+
+    @unittest.skipIf(
+        _merge_model_config_defaults is None,
+        f"AV-HuBERT config helpers unavailable: {IMPORT_ERROR}",
+    )
+    def test_merge_model_config_defaults_backfills_newer_fairseq_fields(self) -> None:
+        @dataclass
+        class BaseConfig:
+            conv_pos: int = 128
+            conv_pos_groups: int = 16
+            pos_conv_depth: int | None = None
+            conv_pos_batch_norm: bool | None = None
+
+        @dataclass
+        class HubertConfig(BaseConfig):
+            encoder_embed_dim: int = 1024
+            encoder_layers: int = 24
+
+        fake_wav2vec2 = mock.Mock(Wav2Vec2Config=BaseConfig)
+        fake_hubert_module = mock.Mock(AVHubertConfig=HubertConfig)
+
+        with mock.patch("builtins.__import__", return_value=fake_wav2vec2):
+            model_cfg = _merge_model_config_defaults(fake_hubert_module, {"encoder_embed_dim": 768})
+
+        self.assertEqual(model_cfg.encoder_embed_dim, 768)
+        self.assertEqual(model_cfg.pos_conv_depth, 1)
+        self.assertFalse(model_cfg.conv_pos_batch_norm)
 
 
 if __name__ == "__main__":
