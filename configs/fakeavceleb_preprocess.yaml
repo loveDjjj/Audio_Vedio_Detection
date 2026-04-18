@@ -2,10 +2,10 @@ paths:
   split_dir: splits/fakeavceleb_real_fullfake
   # Linux host data root lives under /data/OneDay.
   raw_video_root: /data/OneDay/FakeAVCeleb
-  artifact_root: artifacts/avhubert/fakeavceleb_real_fullfake
-  manifest_dir: artifacts/avhubert/fakeavceleb_real_fullfake/manifests
-  landmark_dir: artifacts/avhubert/fakeavceleb_real_fullfake/landmarks
-  mouth_roi_root: artifacts/avhubert/fakeavceleb_real_fullfake/mouth_roi
+  artifact_root: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake
+  manifest_dir: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/manifests
+  landmark_dir: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/landmarks
+  mouth_roi_root: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/mouth_roi
   cnn_detector_path: resources/dlib/mmod_human_face_detector.dat
   face_predictor_path: resources/dlib/shape_predictor_68_face_landmarks.dat
   mean_face_path: resources/avhubert/20words_mean_face.npy

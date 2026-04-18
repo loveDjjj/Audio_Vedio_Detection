@@ -154,14 +154,14 @@ python scripts/plot_mavos_dd_real_fullfake.py --summary outputs/avhubert/mavos_d
 
 - `splits/av1m_official_real_fullfake/`：训练、验证、测试 CSV 及 split 统计
 - `splits/fakeavceleb_real_fullfake/`：FakeAVCeleb `RealVideo-RealAudio` / `FakeVideo-FakeAudio` 的训练、验证、测试 CSV 及 split 统计
-- `artifacts/avhubert/av1m_official_real_fullfake/manifests/`：`train.list`、`val.list`、`test.list`、`all.list`
-- `artifacts/avhubert/av1m_official_real_fullfake/landmarks/`：关键点检测结果
-- `artifacts/avhubert/av1m_official_real_fullfake/mouth_roi/`：裁剪后的嘴部 ROI 视频
-- `artifacts/avhubert/av1m_official_real_fullfake/audio_features/`：离线缓存的音频 logfbank 特征
-- `artifacts/avhubert/av1m_official_real_fullfake/preprocess.log`：预处理主进程日志；worker 日志会写成 `preprocess_rank*.log`
-- `artifacts/avhubert/av1m_official_real_fullfake/audio_cache.log`：音频缓存脚本日志
+- `/data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/manifests/`：`train.list`、`val.list`、`test.list`、`all.list`
+- `/data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/landmarks/`：关键点检测结果
+- `/data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/mouth_roi/`：裁剪后的嘴部 ROI 视频
+- `/data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/audio_features/`：离线缓存的音频 logfbank 特征
+- `/data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/preprocess.log`：预处理主进程日志；worker 日志会写成 `preprocess_rank*.log`
+- `/data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/audio_cache.log`：音频缓存脚本日志
 - `outputs/avhubert/av1m_official_real_fullfake/<timestamp>/`：训练输出目录，包含 `config.yaml`、`train.log`、`best_head.pt`、`last_head.pt`、`summary.json`、`training_curves.png`；多卡时其它 rank 会写 `train_rank*.log`
-- `artifacts/avhubert/fakeavceleb_real_fullfake/`：FakeAVCeleb 独立分支的 manifests、landmarks、mouth ROI、audio features 和日志
+- `/data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/`：FakeAVCeleb 独立分支的 manifests、landmarks、mouth ROI、audio features 和日志
 - `outputs/avhubert/fakeavceleb_real_fullfake/<timestamp>/`：FakeAVCeleb 独立分支的训练输出目录
 
 ## 阅读顺序

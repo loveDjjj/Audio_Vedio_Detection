@@ -15,7 +15,7 @@ class FakeAVCelebWrapperTest(unittest.TestCase):
         self.assertEqual(config["paths"]["split_dir"], "splits/fakeavceleb_real_fullfake")
         self.assertEqual(
             config["paths"]["mouth_roi_root"],
-            "artifacts/avhubert/fakeavceleb_real_fullfake/mouth_roi",
+            "/data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/mouth_roi",
         )
 
     def test_fakeavceleb_classifier_config_paths(self) -> None:
@@ -27,7 +27,7 @@ class FakeAVCelebWrapperTest(unittest.TestCase):
         )
         self.assertEqual(
             config["paths"]["audio_feature_root"],
-            "artifacts/avhubert/fakeavceleb_real_fullfake/audio_features",
+            "/data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/audio_features",
         )
         self.assertEqual(
             config["paths"]["output_root"],

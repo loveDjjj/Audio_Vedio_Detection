@@ -5,11 +5,11 @@ paths:
   dataset_root: /data/OneDay/FakeAVCeleb
   raw_video_root: /data/OneDay/FakeAVCeleb
   split_dir: splits/fakeavceleb_real_fullfake
-  artifact_root: artifacts/avhubert/fakeavceleb_real_fullfake
-  manifest_dir: artifacts/avhubert/fakeavceleb_real_fullfake/manifests
-  landmark_dir: artifacts/avhubert/fakeavceleb_real_fullfake/landmarks
-  mouth_roi_root: artifacts/avhubert/fakeavceleb_real_fullfake/mouth_roi
-  audio_feature_root: artifacts/avhubert/fakeavceleb_real_fullfake/audio_features
+  artifact_root: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake
+  manifest_dir: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/manifests
+  landmark_dir: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/landmarks
+  mouth_roi_root: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/mouth_roi
+  audio_feature_root: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/audio_features
   output_root: outputs/avhubert/fakeavceleb_real_fullfake
   # Shared AV-HuBERT checkpoint is stored outside the repo under /data/OneDay/model.
   checkpoint_path: /data/OneDay/model/self_large_vox_433h.pt

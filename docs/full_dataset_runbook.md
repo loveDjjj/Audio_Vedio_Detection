@@ -119,7 +119,7 @@ python scripts/plot_training_summary.py \
 ### 2.3 输出位置
 
 - split：`splits/av1m_official_real_fullfake/`
-- preprocess / audio cache：`artifacts/avhubert/av1m_official_real_fullfake/`
+- preprocess / audio cache：`/data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/`
 - 训练输出：`outputs/avhubert/av1m_official_real_fullfake/<timestamp>/`
 
 ## 3. FakeAVCeleb
@@ -183,7 +183,7 @@ python scripts/plot_training_summary.py \
 ### 3.3 输出位置
 
 - split：`splits/fakeavceleb_real_fullfake/`
-- preprocess / audio cache：`artifacts/avhubert/fakeavceleb_real_fullfake/`
+- preprocess / audio cache：`/data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/`
 - 训练输出：`outputs/avhubert/fakeavceleb_real_fullfake/<timestamp>/`
 
 ## 4. MAVOS-DD
@@ -265,7 +265,7 @@ python scripts/plot_mavos_dd_real_fullfake.py \
 ### 4.3 输出位置
 
 - split：`splits/mavos_dd_real_fullfake/`
-- preprocess / audio cache：`artifacts/avhubert/mavos_dd_real_fullfake/`
+- preprocess / audio cache：`/data/OneDay/artifacts/avhubert/mavos_dd_real_fullfake/`
 - 训练输出：`outputs/avhubert/mavos_dd_real_fullfake/<timestamp>/`
 
 ## 5. 输出文件说明
