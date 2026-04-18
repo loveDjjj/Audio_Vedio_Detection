@@ -2,56 +2,32 @@
 
 ## 需求
 
-将三套数据集的 `artifacts` 路径统一迁移到 `/data/OneDay/artifacts`，并同步修改生成这些工件和消费这些工件的配置、测试与手册说明。
+修复 `train_fakeavceleb.py` 在 PyTorch 2.6 环境下读取 AV-HuBERT checkpoint 时因 `torch.load` 默认 `weights_only=True` 导致的加载失败。
 
 ## 修改文件
 
-- configs/avhubert_classifier.yaml
-- configs/avhubert_preprocess.yaml
-- configs/fakeavceleb_classifier.yaml
-- configs/fakeavceleb_preprocess.yaml
-- configs/mavos_dd_real_fullfake_classifier.yaml
-- configs/mavos_dd_real_fullfake_preprocess.yaml
-- tests/test_fakeavceleb_wrappers.py
-- README.md
-- docs/full_dataset_runbook.md
+- src/models/avhubert_backbone.py
+- tests/test_avhubert_env.py
 - docs/notes.md
 - docs/logs/2026-04.md
 
 ## 修改内容
 
-- AV1M：将 `artifact_root`、`manifest_dir`、`landmark_dir`、`mouth_roi_root`、`audio_feature_root` 统一改到 `/data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/...`。
-- FakeAVCeleb：将同类工件路径统一改到 `/data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/...`，并同步更新配置测试断言。
-- MAVOS-DD：将同类工件路径统一改到 `/data/OneDay/artifacts/avhubert/mavos_dd_real_fullfake/...`。
-- 文档：README 与运行手册中的 preprocess/audio cache 路径说明同步切换到 `/data/OneDay/artifacts/...`。
+- 在 `src/models/avhubert_backbone.py` 中新增 `load_torch_checkpoint()`，统一通过 `torch.load(..., weights_only=False)` 读取受信任的 AV-HuBERT checkpoint。
+- 为兼容旧版 PyTorch，不支持 `weights_only` 参数时自动回退到 `torch.load(..., map_location="cpu")`。
+- 将 metadata 读取和 backbone 真正加载的两处 checkpoint 读取都切换到该 helper。
+- 在 `tests/test_avhubert_env.py` 中补充 checkpoint 加载兼容分支测试；在当前无 `torch` 的本地环境下改为跳过而不是报错。
 
 ## 验证
 
 ```bash
-python -m unittest tests.test_fakeavceleb_wrappers -v
-python - <<'PY'
-from pathlib import Path
-from src.utils.project import load_config
-for path in (
-    "configs/avhubert_classifier.yaml",
-    "configs/avhubert_preprocess.yaml",
-    "configs/fakeavceleb_classifier.yaml",
-    "configs/fakeavceleb_preprocess.yaml",
-    "configs/mavos_dd_real_fullfake_classifier.yaml",
-    "configs/mavos_dd_real_fullfake_preprocess.yaml",
-):
-    cfg = load_config(Path(path))
-    print(path)
-    for key in ("artifact_root", "manifest_dir", "landmark_dir", "mouth_roi_root"):
-        print(" ", key, "=", cfg["paths"][key])
-    if "audio_feature_root" in cfg["paths"]:
-        print(" ", "audio_feature_root", "=", cfg["paths"]["audio_feature_root"])
-PY
+python -m py_compile src/models/avhubert_backbone.py
+python -m unittest tests.test_avhubert_env -v
 ```
 
-结果：通过。`tests.test_fakeavceleb_wrappers` 5 个用例全部通过；6 个配置文件解析出的 `artifact_root`、`manifest_dir`、`landmark_dir`、`mouth_roi_root` 和 `audio_feature_root` 都已切换到 `/data/OneDay/artifacts/avhubert/...`。
+结果：通过。`src/models/avhubert_backbone.py` 语法检查通过；当前本地环境缺少 `torch`，相关测试被正确跳过，不再因为导入失败中断。
 
 ## Git
 
 - branch: `main`
-- commit: `chore: move artifacts to data disk`
+- commit: `fix: load avhubert checkpoints on torch 2.6`

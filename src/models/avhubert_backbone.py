@@ -52,8 +52,20 @@ def _resolve_checkpoint_configs(state: dict) -> dict:
     }
 
 
+def load_torch_checkpoint(checkpoint_path: Path) -> dict[str, Any]:
+    """Load trusted AV-HuBERT checkpoints across PyTorch pre/post 2.6."""
+    checkpoint_str = str(checkpoint_path)
+    try:
+        # AV-HuBERT checkpoints bundle fairseq config objects, so PyTorch 2.6+
+        # requires opting out of the new weights_only default.
+        return torch.load(checkpoint_str, map_location="cpu", weights_only=False)
+    except TypeError:
+        # Older torch versions do not accept the weights_only kwarg.
+        return torch.load(checkpoint_str, map_location="cpu")
+
+
 def load_avhubert_checkpoint_metadata(checkpoint_path: Path) -> dict[str, Any]:
-    state = torch.load(str(checkpoint_path), map_location="cpu")
+    state = load_torch_checkpoint(checkpoint_path)
     resolved = _resolve_checkpoint_configs(state)
     model_cfg = resolved["model_cfg"]
     task_cfg = resolved["task_cfg"]
@@ -99,7 +111,7 @@ class AVHubertBackbone(nn.Module):
     def _load_avhubert_model(self) -> tuple[nn.Module, dict[str, Any]]:
         _, hubert_pretraining_module, hubert_module, _ = import_avhubert_modules(self.avhubert_repo)
 
-        state = torch.load(str(self.checkpoint_path), map_location="cpu")
+        state = load_torch_checkpoint(self.checkpoint_path)
         resolved = _resolve_checkpoint_configs(state)
         task_cfg = _merge_with_schema_defaults(
             hubert_pretraining_module.AVHubertPretrainingConfig,
