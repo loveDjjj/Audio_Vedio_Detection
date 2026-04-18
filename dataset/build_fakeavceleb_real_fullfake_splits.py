@@ -27,7 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--root",
         type=Path,
-        default=Path("dataset/FakeAVCeleb"),
+        default=Path("/data/OneDay/FakeAVCeleb"),
         help="FakeAVCeleb root directory.",
     )
     parser.add_argument(

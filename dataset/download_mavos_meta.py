@@ -3,7 +3,7 @@
 # snapshot_download(
 #     repo_id="unibuc-cs/MAVOS-DD",
 #     repo_type="dataset",
-#     local_dir="dataset/MAVOS-DD-meta",
+#     local_dir="/data/OneDay/MAVOS-DD",
 #     allow_patterns=[
 #         "README.md",
 #         "dataset_info.json",
@@ -21,7 +21,7 @@ from huggingface_hub import snapshot_download
 snapshot_download(
     repo_id="unibuc-cs/MAVOS-DD",
     repo_type="dataset",
-    local_dir="dataset/MAVOS-DD-english",
+    local_dir="/data/OneDay/MAVOS-DD",
     endpoint="https://hf-mirror.com",
     allow_patterns=[
         "README.md",

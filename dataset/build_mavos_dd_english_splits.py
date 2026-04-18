@@ -17,7 +17,7 @@ from src.data.mavos_dd_subset import build_english_subset_splits, write_split_cs
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build English-only MAVOS-DD subset splits for quick multi-generator experiments.")
-    parser.add_argument("--metadata-root", type=Path, default=Path("dataset/MAVOS-DD-meta"), help="Directory containing MAVOS-DD metadata.")
+    parser.add_argument("--metadata-root", type=Path, default=Path("/data/OneDay/MAVOS-DD"), help="Directory containing MAVOS-DD metadata.")
     parser.add_argument("--output-dir", type=Path, default=Path("splits/mavos_dd_english_small"), help="Output directory for sampled split CSVs.")
     parser.add_argument("--train-ratio", type=float, default=0.2, help="Fraction of English train records to keep, stratified by generator.")
     parser.add_argument("--test-ratio", type=float, default=0.2, help="Fraction of English open-set-model test records to keep, stratified by generator.")

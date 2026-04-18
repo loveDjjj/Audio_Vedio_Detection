@@ -1,8 +1,9 @@
 experiment_name: av1m_val_real_fullfake_avhubert
 
 paths:
-  dataset_root: dataset/AV-Deepfake1M
-  raw_video_root: dataset/AV-Deepfake1M/val
+  # Linux host data root lives under /data/OneDay.
+  dataset_root: /data/OneDay/AV-Deepfake1M
+  raw_video_root: /data/OneDay/AV-Deepfake1M/val
   split_dir: splits/av1m_val_real_fullfake
   artifact_root: artifacts/avhubert/av1m_val_real_fullfake
   manifest_dir: artifacts/avhubert/av1m_val_real_fullfake/manifests
@@ -10,7 +11,8 @@ paths:
   mouth_roi_root: artifacts/avhubert/av1m_val_real_fullfake/mouth_roi
   audio_feature_root: artifacts/avhubert/av1m_val_real_fullfake/audio_features
   output_root: outputs/avhubert/av1m_val_real_fullfake
-  checkpoint_path: model/self_large_vox_433h.pt
+  # Shared AV-HuBERT checkpoint is stored outside the repo under /data/OneDay/model.
+  checkpoint_path: /data/OneDay/model/self_large_vox_433h.pt
   avhubert_repo: third_party/av_hubert
   ffmpeg_path: /usr/bin/ffmpeg
   cnn_detector_path: resources/dlib/mmod_human_face_detector.dat

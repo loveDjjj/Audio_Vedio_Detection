@@ -7,7 +7,7 @@ from huggingface_hub import hf_hub_download
 
 
 REPO_ID = "ControlNet/AV-Deepfake1M"
-ROOT = Path("dataset/AV-Deepfake1M")
+ROOT = Path("/data/OneDay/AV-Deepfake1M")
 VAL_DIR = ROOT / "val"
 MAX_RETRIES = 10
 RETRY_SLEEP_SECONDS = 5

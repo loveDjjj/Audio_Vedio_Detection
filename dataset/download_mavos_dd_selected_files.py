@@ -20,7 +20,7 @@ from src.utils.logging_utils import build_logger
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Download only the MAVOS-DD files referenced by sampled CSV splits.")
     parser.add_argument("--split-dir", type=Path, default=Path("splits/mavos_dd_english_small"), help="Directory containing train/val/test CSVs.")
-    parser.add_argument("--output-root", type=Path, default=Path("dataset/MAVOS-DD-english-small"), help="Directory to download selected files into.")
+    parser.add_argument("--output-root", type=Path, default=Path("/data/OneDay/MAVOS-DD"), help="Directory to download selected files into.")
     parser.add_argument("--repo-id", default="unibuc-cs/MAVOS-DD", help="Hugging Face dataset repo id.")
     return parser.parse_args()
 

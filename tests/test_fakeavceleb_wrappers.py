@@ -11,7 +11,7 @@ from src.utils.project import load_config
 class FakeAVCelebWrapperTest(unittest.TestCase):
     def test_fakeavceleb_preprocess_config_paths(self) -> None:
         config = load_config(Path("configs/fakeavceleb_preprocess.yaml"))
-        self.assertEqual(config["paths"]["raw_video_root"], "dataset/FakeAVCeleb")
+        self.assertEqual(config["paths"]["raw_video_root"], "/data/OneDay/FakeAVCeleb")
         self.assertEqual(config["paths"]["split_dir"], "splits/fakeavceleb_real_fullfake")
         self.assertEqual(
             config["paths"]["mouth_roi_root"],
@@ -20,7 +20,11 @@ class FakeAVCelebWrapperTest(unittest.TestCase):
 
     def test_fakeavceleb_classifier_config_paths(self) -> None:
         config = load_config(Path("configs/fakeavceleb_classifier.yaml"))
-        self.assertEqual(config["paths"]["raw_video_root"], "dataset/FakeAVCeleb")
+        self.assertEqual(config["paths"]["raw_video_root"], "/data/OneDay/FakeAVCeleb")
+        self.assertEqual(
+            config["paths"]["checkpoint_path"],
+            "/data/OneDay/model/self_large_vox_433h.pt",
+        )
         self.assertEqual(
             config["paths"]["audio_feature_root"],
             "artifacts/avhubert/fakeavceleb_real_fullfake/audio_features",

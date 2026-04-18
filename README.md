@@ -96,7 +96,7 @@ python dataset/build_fakeavceleb_real_fullfake_splits.py
 python scripts/preprocess_fakeavceleb.py
 python scripts/cache_fakeavceleb_audio_features.py
 python scripts/train_fakeavceleb.py
-python scripts/inspect_mavos_dd_metadata.py --metadata-root dataset/MAVOS-DD-meta
+python scripts/inspect_mavos_dd_metadata.py --metadata-root /data/OneDay/MAVOS-DD
 python dataset/build_mavos_dd_english_splits.py
 python dataset/download_mavos_dd_selected_files.py
 python scripts/preprocess_mavos_dd_english_small.py
@@ -107,9 +107,10 @@ python scripts/plot_mavos_dd_english_small.py --summary outputs/avhubert/mavos_d
 
 运行前需要确认以下资源已经就位：
 
-- 数据目录：`dataset/AV-Deepfake1M/val`
+- 数据目录：`/data/OneDay/AV-Deepfake1M/val`、`/data/OneDay/FakeAVCeleb`、`/data/OneDay/MAVOS-DD`
+  - 其中 MAVOS-DD 相关脚本默认也从 `/data/OneDay/MAVOS-DD` 读取 metadata / raw video，并向该目录下载选中的文件
 - 主配置：`configs/avhubert_classifier.yaml`
-- 权重文件：`model/self_large_vox_433h.pt`
+- 权重文件：`/data/OneDay/model/self_large_vox_433h.pt`
 - 第三方仓库：`third_party/av_hubert`
 - 外部工具：`ffmpeg`
 - 预处理设备：CUDA 可用的 NVIDIA GPU（当前 mouth ROI 预处理要求 dlib CUDA CNN detector，不再回退到 CPU HOG detector）

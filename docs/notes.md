@@ -2,56 +2,38 @@
 
 ## 需求
 
-接入 FakeAVCeleb 独立训练分支，只使用 `dataset/FakeAVCeleb/RealVideo-RealAudio` 与 `dataset/FakeAVCeleb/FakeVideo-FakeAudio`，新增 split builder、专用 YAML、wrapper 与 committed splits，并保持与当前 AV-HuBERT 流程兼容。
+新增一份全量数据集运行操作手册，按数据集逐个列出运行命令，并明确服务器上的环境切换约定：`avhubert` 只用于 dlib 预处理，`oneday` 用于其余步骤。
 
 ## 修改文件
 
-- dataset/build_fakeavceleb_real_fullfake_splits.py
-- src/data/fakeavceleb_subset.py
-- configs/fakeavceleb_preprocess.yaml
-- configs/fakeavceleb_classifier.yaml
-- scripts/preprocess_fakeavceleb.py
-- scripts/cache_fakeavceleb_audio_features.py
-- scripts/train_fakeavceleb.py
-- tests/test_fakeavceleb_subset.py
-- tests/test_fakeavceleb_wrappers.py
-- splits/fakeavceleb_real_fullfake/train.csv
-- splits/fakeavceleb_real_fullfake/val.csv
-- splits/fakeavceleb_real_fullfake/test.csv
-- splits/fakeavceleb_real_fullfake/summary.json
-- README.md
+- docs/full_dataset_runbook.md
 - docs/notes.md
 - docs/logs/2026-04.md
 
 ## 修改内容
 
-- 新增 `src/data/fakeavceleb_subset.py`，集中处理 FakeAVCeleb metadata 解析、`RealVideo-RealAudio` / `FakeVideo-FakeAudio` 过滤、按生成方法的 `1:1` 平衡采样、随机视频切分和 CSV/summary 写出。
-- 新增 `dataset/build_fakeavceleb_real_fullfake_splits.py`，生成 `splits/fakeavceleb_real_fullfake/{train,val,test}.csv` 与 `summary.json`，并基于当前本地数据生成了 1000 条平衡子集。
-- 新增 FakeAVCeleb 专用 preprocess/classifier YAML 与三个零参数 wrapper，直接复用当前 mouth ROI、audio cache 和训练入口。
-- 新增 `tests/test_fakeavceleb_subset.py` 与 `tests/test_fakeavceleb_wrappers.py`，覆盖 FakeAVCeleb 子集构建逻辑、配置路径和 wrapper 调用路径。
-- 更新 `README.md`，补充 FakeAVCeleb 分支的结构、关键文件、运行命令、配置说明和输出目录。
+- 新增 `docs/full_dataset_runbook.md`，按 AV-Deepfake1M、FakeAVCeleb、MAVOS-DD 三个分支分别给出 split 构建、预处理、音频缓存、训练、绘图的顺序命令。
+- 在手册中明确环境切换规则：`conda activate avhubert` 仅用于 mouth ROI 预处理，`conda activate oneday` 用于其余脚本。
+- 在手册中补充当前代码边界，明确哪些“全量”是当前仓库可以直接跑的范围，哪些还不是完整官方全量协议。
+- 在手册中说明 `outputs/` 目录的实际产物包含模型权重，但 `.gitignore` 默认只跟踪 `yaml/json/png`。
 
 ## 验证
 
 ```bash
-python -m unittest tests.test_fakeavceleb_subset tests.test_fakeavceleb_wrappers -v
-python dataset/build_fakeavceleb_real_fullfake_splits.py --root dataset/FakeAVCeleb --output-dir splits/fakeavceleb_real_fullfake --seed 42
-python scripts/train_fakeavceleb.py --help
-python - <<'PY'
-import csv
-from pathlib import Path
-for name in ["train", "val", "test"]:
-    path = Path("splits/fakeavceleb_real_fullfake") / f"{name}.csv"
-    with path.open("r", encoding="utf-8", newline="") as handle:
-        reader = csv.DictReader(handle)
-        rows = list(reader)
-    print(name, len(rows), reader.fieldnames)
-PY
+Get-Content docs/full_dataset_runbook.md
+python dataset/build_av1m_val_real_fullfake_splits.py --help
+python dataset/build_fakeavceleb_real_fullfake_splits.py --help
+python dataset/build_mavos_dd_english_splits.py --help
+python dataset/download_mavos_dd_selected_files.py --help
+python scripts/inspect_mavos_dd_metadata.py --help
+git check-ignore -v outputs/avhubert/av1m_val_real_fullfake/20260411-040113/best_head.pt
+git check-ignore -v outputs/avhubert/av1m_val_real_fullfake/20260411-040113/summary.json
+git check-ignore -v outputs/avhubert/av1m_val_real_fullfake/20260411-040113/training_curves.png
 ```
 
-结果：通过。单测通过；split builder 生成 `train=800 / val=100 / test=100`；训练 wrapper `--help` 正常；三份 CSV 均包含 `relative_path`、`label`、`method` 等预期字段。
+结果：通过。`docs/full_dataset_runbook.md` 已生成；手册中引用的 5 个脚本入口均可正常显示 `--help`；`git check-ignore -v` 显示 `outputs/.../best_head.pt` 会被 ignore，而 `summary.json` 与 `training_curves.png` 不会被 ignore。
 
 ## Git
 
 - branch: `main`
-- commit: `git commit -m "feat: add fakeavceleb real fullfake pipeline"`
+- commit: 待确认

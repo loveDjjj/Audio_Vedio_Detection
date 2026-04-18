@@ -33,8 +33,7 @@ def print_progress(current: int, total: int) -> None:
     )
 
 
-root = Path(__file__).resolve().parent
-model_dir = root / "model"
+model_dir = Path("/data/OneDay/model")
 model_dir.mkdir(parents=True, exist_ok=True)
 
 target_path = model_dir / MODEL_NAME

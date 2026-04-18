@@ -22,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--metadata-root",
         type=Path,
-        default=Path("dataset/MAVOS-DD-meta"),
+        default=Path("/data/OneDay/MAVOS-DD"),
         help="Directory containing MAVOS-DD metadata files including data-*.arrow.",
     )
     parser.add_argument(
