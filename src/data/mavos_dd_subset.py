@@ -2,41 +2,40 @@ from __future__ import annotations
 
 import csv
 import json
-import math
-import random
-from collections import defaultdict
 from pathlib import Path
 
 
-def sample_records_by_generator(records: list[dict], sample_ratio: float, seed: int) -> list[dict]:
-    if not (0 < sample_ratio <= 1):
-        raise ValueError(f"sample_ratio must be in (0, 1], got {sample_ratio}")
+def _is_real_real(record: dict) -> bool:
+    return (
+        record.get("label") == "real"
+        and not bool(record.get("audio_fake", False))
+        and not bool(record.get("video_fake", False))
+    )
 
-    grouped: dict[str, list[dict]] = defaultdict(list)
+
+def _is_fake_fake(record: dict) -> bool:
+    return (
+        record.get("label") == "fake"
+        and bool(record.get("audio_fake", False))
+        and bool(record.get("video_fake", False))
+    )
+
+
+def build_real_fullfake_official_splits(records: list[dict]) -> dict[str, list[dict]]:
+    split_map: dict[str, list[dict]] = {"train": [], "val": [], "test": []}
     for record in records:
-        grouped[str(record["generative_method"])].append(record)
+        split_name = str(record.get("split", "")).strip().lower()
+        if split_name not in {"train", "validation", "test"}:
+            continue
+        if not (_is_real_real(record) or _is_fake_fake(record)):
+            continue
 
-    sampled: list[dict] = []
-    for generator, items in sorted(grouped.items()):
-        shuffled = list(items)
-        random.Random(f"{seed}:{generator}").shuffle(shuffled)
-        keep = max(1, math.ceil(len(shuffled) * sample_ratio))
-        sampled.extend(shuffled[:keep])
-    sampled.sort(key=lambda item: str(item.get("video_path", item.get("relative_path", ""))))
-    return sampled
+        target_split = "val" if split_name == "validation" else split_name
+        split_map[target_split].append(record)
 
-
-def build_english_subset_splits(records: list[dict], train_ratio: float, test_ratio: float, seed: int) -> dict[str, list[dict]]:
-    english_records = [record for record in records if record["language"] == "english"]
-    train_records = [record for record in english_records if record["split"] == "train"]
-    val_records = [record for record in english_records if record["split"] == "validation"]
-    test_records = [record for record in english_records if record["split"] == "test" and record["open_set_model"]]
-
-    return {
-        "train": sample_records_by_generator(train_records, sample_ratio=train_ratio, seed=seed),
-        "val": sorted(val_records, key=lambda item: str(item["video_path"])),
-        "test": sample_records_by_generator(test_records, sample_ratio=test_ratio, seed=seed + 1),
-    }
+    for split_name in split_map:
+        split_map[split_name].sort(key=lambda item: str(item["video_path"]))
+    return split_map
 
 
 def to_csv_row(record: dict) -> dict:

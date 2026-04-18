@@ -13,7 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.data.fakeavceleb_subset import (
     build_summary,
     load_fakeavceleb_records,
-    sample_balanced_binary_records,
+    select_real_fullfake_records,
     split_records,
     write_split_csv,
     write_summary,
@@ -22,7 +22,7 @@ from src.data.fakeavceleb_subset import (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build balanced FakeAVCeleb real-vs-fullfake train/val/test CSV splits."
+        description="Build full FakeAVCeleb real/real vs fake/fake train/val/test CSV splits."
     )
     parser.add_argument(
         "--root",
@@ -51,7 +51,7 @@ def main() -> int:
     output_dir = args.output_dir.resolve()
 
     source_records = load_fakeavceleb_records(root)
-    selected_records = sample_balanced_binary_records(source_records, seed=args.seed)
+    selected_records = select_real_fullfake_records(source_records)
     split_map = split_records(selected_records, seed=args.seed)
 
     output_dir.mkdir(parents=True, exist_ok=True)

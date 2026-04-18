@@ -1,7 +1,8 @@
 paths:
   split_dir: splits/av1m_val_real_fullfake
   # Linux host data root lives under /data/OneDay.
-  raw_video_root: /data/OneDay/AV-Deepfake1M/val
+  # Full-protocol AV1M splits now store train/ and val/ prefixes in relative_path.
+  raw_video_root: /data/OneDay/AV-Deepfake1M
   artifact_root: artifacts/avhubert/av1m_val_real_fullfake
   manifest_dir: artifacts/avhubert/av1m_val_real_fullfake/manifests
   landmark_dir: artifacts/avhubert/av1m_val_real_fullfake/landmarks

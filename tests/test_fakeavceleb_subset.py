@@ -7,7 +7,7 @@ from src.data.fakeavceleb_subset import (
     FakeAVCelebRecord,
     build_split_rows,
     load_fakeavceleb_records,
-    sample_balanced_binary_records,
+    select_real_fullfake_records,
     split_records,
 )
 
@@ -61,7 +61,7 @@ id99999,-,-,rtvc,B,RealVideo-FakeAudio,African,men,ignore.mp4,FakeAVCeleb/RealVi
             "RealVideo-RealAudio/African/men/id00002/00002.mp4",
         )
 
-    def test_balanced_sampling_is_deterministic_and_label_balanced(self) -> None:
+    def test_full_protocol_selection_keeps_all_supported_records(self) -> None:
         records = [
             FakeAVCelebRecord(
                 relative_path=f"RealVideo-RealAudio/African/men/id{i:05d}/{i:05d}.mp4",
@@ -109,15 +109,15 @@ id99999,-,-,rtvc,B,RealVideo-FakeAudio,African,men,ignore.mp4,FakeAVCeleb/RealVi
             )
         )
 
-        selected_a = sample_balanced_binary_records(records, seed=7)
-        selected_b = sample_balanced_binary_records(records, seed=7)
+        selected = select_real_fullfake_records(records)
 
+        self.assertEqual(len(selected), len(records))
+        self.assertEqual(sum(row.label == 0 for row in selected), 5)
+        self.assertEqual(sum(row.label == 1 for row in selected), 8)
         self.assertEqual(
-            [row.relative_path for row in selected_a],
-            [row.relative_path for row in selected_b],
+            [row.relative_path for row in selected],
+            sorted(row.relative_path for row in records),
         )
-        self.assertEqual(sum(row.label == 0 for row in selected_a), 5)
-        self.assertEqual(sum(row.label == 1 for row in selected_a), 5)
 
     def test_split_records_produces_expected_sizes(self) -> None:
         records = [

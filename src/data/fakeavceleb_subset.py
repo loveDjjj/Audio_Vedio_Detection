@@ -87,77 +87,61 @@ def load_fakeavceleb_records(root: Path) -> list[FakeAVCelebRecord]:
     return records
 
 
-def _sample_fake_records_by_method(
-    fake_records: list[FakeAVCelebRecord], target_count: int, seed: int
-) -> list[FakeAVCelebRecord]:
-    if target_count < 1:
-        return []
-    if len(fake_records) < target_count:
-        raise ValueError(
-            f"Not enough fake FakeAVCeleb records to sample target_count={target_count}, got {len(fake_records)}"
-        )
-
-    grouped: dict[str, list[FakeAVCelebRecord]] = defaultdict(list)
-    for record in fake_records:
-        grouped[record.method].append(record)
-
-    total = len(fake_records)
-    selected: list[FakeAVCelebRecord] = []
-    selected_paths: set[str] = set()
-    remainders: list[tuple[float, str]] = []
-
-    for method, items in sorted(grouped.items()):
-        shuffled = list(items)
-        random.Random(f"{seed}:{method}").shuffle(shuffled)
-        raw_keep = target_count * len(items) / total
-        keep = min(len(items), math.floor(raw_keep))
-        chosen = sorted(shuffled[:keep], key=lambda item: item.relative_path)
-        selected.extend(chosen)
-        selected_paths.update(item.relative_path for item in chosen)
-        remainders.append((raw_keep - keep, method))
-
-    while len(selected) < target_count:
-        made_progress = False
-        for _fraction, method in sorted(remainders, key=lambda item: (-item[0], item[1])):
-            remaining = [item for item in grouped[method] if item.relative_path not in selected_paths]
-            if not remaining:
-                continue
-            shuffled = list(remaining)
-            random.Random(f"{seed}:remainder:{method}:{len(selected)}").shuffle(shuffled)
-            chosen = min(shuffled, key=lambda item: item.relative_path)
-            selected.append(chosen)
-            selected_paths.add(chosen.relative_path)
-            made_progress = True
-            if len(selected) == target_count:
-                break
-        if not made_progress:
-            raise RuntimeError("Unable to complete FakeAVCeleb method-aware sampling.")
-
-    return sorted(selected, key=lambda item: item.relative_path)
+def select_real_fullfake_records(records: list[FakeAVCelebRecord]) -> list[FakeAVCelebRecord]:
+    return sorted(records, key=lambda item: item.relative_path)
 
 
-def sample_balanced_binary_records(records: list[FakeAVCelebRecord], seed: int) -> list[FakeAVCelebRecord]:
-    real_records = sorted((record for record in records if record.label == 0), key=lambda item: item.relative_path)
-    fake_records = [record for record in records if record.label == 1]
-    sampled_fake = _sample_fake_records_by_method(fake_records, target_count=len(real_records), seed=seed)
-    return sorted(real_records + sampled_fake, key=lambda item: item.relative_path)
+def _allocate_counts(total: int, ratios: tuple[float, ...]) -> list[int]:
+    raw_counts = [total * ratio for ratio in ratios]
+    counts = [math.floor(raw) for raw in raw_counts]
+    remainder = total - sum(counts)
+    ordering = sorted(
+        range(len(ratios)),
+        key=lambda index: (raw_counts[index] - counts[index], -index),
+        reverse=True,
+    )
+    for index in ordering[:remainder]:
+        counts[index] += 1
+    return counts
 
 
 def split_records(records: list[FakeAVCelebRecord], seed: int) -> dict[str, list[FakeAVCelebRecord]]:
-    shuffled = list(records)
-    random.Random(seed).shuffle(shuffled)
-    total = len(shuffled)
-    train_end = int(total * 0.8)
-    val_end = int(total * 0.9)
-    split_map = {
-        "train": shuffled[:train_end],
-        "val": shuffled[train_end:val_end],
-        "test": shuffled[val_end:],
-    }
-    return {
-        split_name: sorted(split_rows, key=lambda item: item.relative_path)
-        for split_name, split_rows in split_map.items()
-    }
+    grouped: dict[tuple[str, str], list[FakeAVCelebRecord]] = defaultdict(list)
+    for record in records:
+        stratum_key = (record.label_name, "real" if record.label == 0 else record.method)
+        grouped[stratum_key].append(record)
+
+    split_names = ("train", "val", "test")
+    target_totals = _allocate_counts(len(records), (0.8, 0.1, 0.1))
+    current_totals = [0, 0, 0]
+    split_map: dict[str, list[FakeAVCelebRecord]] = {"train": [], "val": [], "test": []}
+    for (label_name, method), items in sorted(grouped.items()):
+        shuffled = list(items)
+        random.Random(f"{seed}:{label_name}:{method}").shuffle(shuffled)
+        raw_counts = [len(shuffled) * ratio for ratio in (0.8, 0.1, 0.1)]
+        group_counts = [math.floor(raw) for raw in raw_counts]
+        remaining = len(shuffled) - sum(group_counts)
+        while remaining > 0:
+            ordering = sorted(
+                range(len(split_names)),
+                key=lambda index: (
+                    raw_counts[index] - group_counts[index],
+                    target_totals[index] - (current_totals[index] + group_counts[index]),
+                    -index,
+                ),
+                reverse=True,
+            )
+            group_counts[ordering[0]] += 1
+            remaining -= 1
+
+        start = 0
+        for index, split_name in enumerate(split_names):
+            end = start + group_counts[index]
+            split_map[split_name].extend(shuffled[start:end])
+            current_totals[index] += group_counts[index]
+            start = end
+
+    return {split_name: sorted(split_rows, key=lambda item: item.relative_path) for split_name, split_rows in split_map.items()}
 
 
 def build_split_rows(records: list[FakeAVCelebRecord]) -> list[dict]:
@@ -196,7 +180,7 @@ def build_summary(
     return {
         "dataset": "FakeAVCeleb",
         "selection": ["RealVideo-RealAudio", "FakeVideo-FakeAudio"],
-        "split_strategy": "random_video_level",
+        "split_strategy": "stratified_random_video_level",
         "seed": seed,
         "source_videos": len(source_records),
         "selected_videos": len(selected_records),

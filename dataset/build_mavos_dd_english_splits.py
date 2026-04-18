@@ -12,23 +12,22 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.data.mavos_dd_metadata import load_mavos_dd_records
-from src.data.mavos_dd_subset import build_english_subset_splits, write_split_csv, write_summary
+from src.data.mavos_dd_subset import build_real_fullfake_official_splits, write_split_csv, write_summary
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build English-only MAVOS-DD subset splits for quick multi-generator experiments.")
+    parser = argparse.ArgumentParser(
+        description="Build MAVOS-DD official real/real vs fake/fake train/val/test CSV splits."
+    )
     parser.add_argument("--metadata-root", type=Path, default=Path("/data/OneDay/MAVOS-DD"), help="Directory containing MAVOS-DD metadata.")
-    parser.add_argument("--output-dir", type=Path, default=Path("splits/mavos_dd_english_small"), help="Output directory for sampled split CSVs.")
-    parser.add_argument("--train-ratio", type=float, default=0.2, help="Fraction of English train records to keep, stratified by generator.")
-    parser.add_argument("--test-ratio", type=float, default=0.2, help="Fraction of English open-set-model test records to keep, stratified by generator.")
-    parser.add_argument("--seed", type=int, default=42, help="Sampling seed.")
+    parser.add_argument("--output-dir", type=Path, default=Path("splits/mavos_dd_english_small"), help="Output directory for generated split CSVs.")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     records = load_mavos_dd_records(args.metadata_root)
-    split_map = build_english_subset_splits(records, train_ratio=args.train_ratio, test_ratio=args.test_ratio, seed=args.seed)
+    split_map = build_real_fullfake_official_splits(records)
 
     output_dir = args.output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -39,10 +38,12 @@ def main() -> int:
 
     summary = {
         "dataset": "MAVOS-DD",
-        "language": "english",
-        "train_ratio": args.train_ratio,
-        "test_ratio": args.test_ratio,
-        "seed": args.seed,
+        "selection": {
+            "real": {"label": "real", "audio_fake": False, "video_fake": False},
+            "fake": {"label": "fake", "audio_fake": True, "video_fake": True},
+        },
+        "split_strategy": "official_split",
+        "source_videos": len(records),
         "splits": {},
     }
     for split_name, records_ in split_map.items():

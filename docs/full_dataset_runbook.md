@@ -43,20 +43,25 @@ ls /data/OneDay/model/self_large_vox_433h.pt
 
 当前仓库对 AV-Deepfake1M 的现成入口是：
 
-- 只跑 `/data/OneDay/AV-Deepfake1M/val`
-- 只使用 `real.mp4` 和 `fake_video_fake_audio.mp4`
+- 使用官方 `train_metadata.json` 和 `val_metadata.json`
+- 只保留 `real.mp4` 和 `fake_video_fake_audio.mp4`
+- 官方 `train` 全量作为训练集，官方 `val` 再按 clip 级随机切成 `val/test`
 
-也就是说，这里是当前仓库支持的 `real/real vs fake/fake` 运行链路，但不是 AV-Deepfake1M 全库 train+val+test 的完整协议。
+也就是说，这里是当前仓库当前支持的 AV1M `real/real vs fake/fake` 全量协议。
 
 ### 2.2 命令顺序
 
-如需补下载 `val`：
+如需补下载元数据与 `val` 分卷：
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
 conda activate oneday
 python dataset/download_av1m_meta.py
 ```
+
+注意：
+- 该脚本当前只会下载 `val` 分卷与 `val_metadata.json`
+- 跑 AV1M 全量协议前，需要你提前准备好 `/data/OneDay/AV-Deepfake1M/train` 和 `train_metadata.json`
 
 构建 split：
 
@@ -116,9 +121,9 @@ python scripts/plot_training_summary.py \
 
 - 只使用 `RealVideo-RealAudio`
 - 只使用 `FakeVideo-FakeAudio`
-- split builder 会保留全部 real，并按生成方法从 fake 中做 `1:1` 平衡采样
+- split builder 会保留全部符合条件的样本，并按 `label/method` 分层切分 `train/val/test`
 
-也就是说，这里是当前仓库支持的 `real/real vs fake/fake` 运行链路，但不是把全部 fake 样本无平衡地全部纳入训练。
+也就是说，这里是当前仓库当前支持的 FakeAVCeleb `real/real vs fake/fake` 全量协议。
 
 ### 3.2 命令顺序
 
@@ -176,15 +181,14 @@ python scripts/plot_training_summary.py \
 
 ### 4.1 当前代码边界
 
-当前仓库对 MAVOS-DD 的现成入口不是整库全协议，而是：
+当前仓库对 MAVOS-DD 的现成入口是：
 
-- 只跑 `english`
-- `train` 来自英语训练集
-- `val` 来自英语验证集
-- `test` 只取 `open_set_model=true`
+- 保留官方 `train / validation / test`
+- 只保留 `real/real` 与 `fake/fake`
+- 不再限制 `language`
+- 不再限制 `open_set_model`
 
-如果要在当前协议下尽量跑满，就把 `train_ratio` 和 `test_ratio` 设为 `1.0`。  
-这代表“跑满当前 English small 协议”，不是完整的 MAVOS-DD 全语言全协议 benchmark。
+脚本和配置文件名仍保留 `english_small` 历史命名，但当前生成的是 MAVOS-DD `real/real vs fake/fake` 全量协议。
 
 ### 4.2 命令顺序
 
@@ -196,17 +200,14 @@ conda activate oneday
 python scripts/inspect_mavos_dd_metadata.py --metadata-root /data/OneDay/MAVOS-DD
 ```
 
-构建当前协议下的全量 split：
+构建全量 split：
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
 conda activate oneday
 python dataset/build_mavos_dd_english_splits.py \
   --metadata-root /data/OneDay/MAVOS-DD \
-  --output-dir splits/mavos_dd_english_small \
-  --train-ratio 1.0 \
-  --test-ratio 1.0 \
-  --seed 42
+  --output-dir splits/mavos_dd_english_small
 ```
 
 如需补下载 split 引用到的视频文件：
@@ -277,9 +278,8 @@ python scripts/plot_mavos_dd_english_small.py \
 
 ## 6. 当前需要你额外确认的点
 
-- 如果你说的“全量”是指三个数据集都跑完整官方协议，那么当前仓库还不完全支持
-- 当前仓库可直接运行的是：
-  - AV1M：`val` 子集里的 `real.mp4` vs `fake_video_fake_audio.mp4`
-  - FakeAVCeleb：`RealVideo-RealAudio` vs `FakeVideo-FakeAudio` 的平衡版本
-  - MAVOS-DD：English-only 协议，且 test 只取 `open_set_model=true`
-- 如果下一步要把这三条链都扩成真正的全量协议，需要继续补 split builder / 配置 / 文档
+- 当前仓库现在可直接运行的是：
+  - AV1M：官方 `train + val` 下的 `real.mp4` vs `fake_video_fake_audio.mp4`
+  - FakeAVCeleb：`RealVideo-RealAudio` vs `FakeVideo-FakeAudio` 全量样本
+  - MAVOS-DD：官方 split 下的全语言 `real/real` vs `fake/fake`
+- 目录名和部分脚本名沿用了历史命名，例如 `av1m_val_real_fullfake`、`mavos_dd_english_small`，但当前协议内容已经切换到全量版本

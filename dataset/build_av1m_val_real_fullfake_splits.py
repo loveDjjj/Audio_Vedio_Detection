@@ -3,7 +3,9 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import random
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,6 +15,7 @@ class VideoRecord:
     relative_path: str
     label: int
     label_name: str
+    source_split: str
     clip_key: str
     person_id: str
     source_video_id: str
@@ -22,8 +25,8 @@ class VideoRecord:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Build train/val/test lists from AV-Deepfake1M val split using only "
-            "real.mp4 and fake_video_fake_audio.mp4 with random video-level splitting."
+            "Build AV-Deepfake1M real/real vs fake/fake CSV splits from the official "
+            "train_metadata.json and val_metadata.json protocol."
         )
     )
     parser.add_argument(
@@ -52,9 +55,19 @@ def load_metadata(path: Path) -> list[dict]:
         return json.load(handle)
 
 
-def build_video_records(root: Path) -> tuple[list[VideoRecord], dict[str, int]]:
-    metadata_path = root / "val_metadata.json"
-    val_dir = root / "val"
+def _select_label(item: dict) -> tuple[int, str] | None:
+    rel_path = str(item["file"])
+    filename = Path(rel_path).name
+    modify_type = str(item.get("modify_type", ""))
+    if filename == "real.mp4" or modify_type == "real":
+        return 0, "real"
+    if filename == "fake_video_fake_audio.mp4" or modify_type == "both_modified":
+        return 1, "fake_video_fake_audio"
+    return None
+
+
+def _build_records_for_split(root: Path, source_split: str) -> tuple[list[VideoRecord], dict[str, int]]:
+    metadata_path = root / f"{source_split}_metadata.json"
     data = load_metadata(metadata_path)
 
     records: list[VideoRecord] = []
@@ -66,20 +79,19 @@ def build_video_records(root: Path) -> tuple[list[VideoRecord], dict[str, int]]:
     }
 
     for item in data:
-        rel_path = item["file"]
-        filename = rel_path.split("/")[-1]
-        if filename == "real.mp4":
-            label = 0
-            label_name = "real"
-            stats["real_rows"] += 1
-        elif filename == "fake_video_fake_audio.mp4":
-            label = 1
-            label_name = "fake_video_fake_audio"
-            stats["fullfake_rows"] += 1
-        else:
+        label_info = _select_label(item)
+        if label_info is None:
             continue
 
-        full_path = val_dir / rel_path
+        rel_path = str(item["file"]).strip()
+        relative_path = f"{source_split}/{rel_path}"
+        label, label_name = label_info
+        if label == 0:
+            stats["real_rows"] += 1
+        else:
+            stats["fullfake_rows"] += 1
+
+        full_path = root / relative_path
         if not full_path.exists():
             stats["missing_video_files"] += 1
             continue
@@ -87,10 +99,11 @@ def build_video_records(root: Path) -> tuple[list[VideoRecord], dict[str, int]]:
         person_id, source_video_id, clip_id = rel_path.split("/")[:3]
         records.append(
             VideoRecord(
-                relative_path=rel_path,
+                relative_path=relative_path,
                 label=label,
                 label_name=label_name,
-                clip_key="/".join(rel_path.split("/")[:3]),
+                source_split=source_split,
+                clip_key=f"{source_split}/" + "/".join(rel_path.split("/")[:3]),
                 person_id=person_id,
                 source_video_id=source_video_id,
                 clip_id=clip_id,
@@ -98,26 +111,59 @@ def build_video_records(root: Path) -> tuple[list[VideoRecord], dict[str, int]]:
         )
 
     stats["selected_videos"] = len(records)
-    return records, stats
+    return sorted(records, key=lambda record: record.relative_path), stats
+
+
+def build_video_records(root: Path) -> tuple[list[VideoRecord], dict[str, dict[str, int]]]:
+    records: list[VideoRecord] = []
+    source_stats: dict[str, dict[str, int]] = {}
+    for source_split in ("train", "val"):
+        split_records, split_stats = _build_records_for_split(root, source_split)
+        records.extend(split_records)
+        source_stats[source_split] = split_stats
+    return records, source_stats
+
+
+def _allocate_counts(total: int, ratios: tuple[float, ...]) -> list[int]:
+    raw_counts = [total * ratio for ratio in ratios]
+    counts = [math.floor(raw) for raw in raw_counts]
+    remainder = total - sum(counts)
+    ordering = sorted(
+        range(len(ratios)),
+        key=lambda index: (raw_counts[index] - counts[index], -index),
+        reverse=True,
+    )
+    for index in ordering[:remainder]:
+        counts[index] += 1
+    return counts
 
 
 def split_records(records: list[VideoRecord], seed: int) -> dict[str, list[VideoRecord]]:
-    shuffled = list(records)
-    random.Random(seed).shuffle(shuffled)
+    train_records = sorted((record for record in records if record.source_split == "train"), key=lambda item: item.relative_path)
+    val_source_records = [record for record in records if record.source_split == "val"]
 
-    total = len(shuffled)
-    train_end = int(total * 0.8)
-    val_end = int(total * 0.9)
+    grouped_val: dict[str, list[VideoRecord]] = defaultdict(list)
+    for record in val_source_records:
+        grouped_val[record.clip_key].append(record)
 
-    split_records = {
-        "train": shuffled[:train_end],
-        "val": shuffled[train_end:val_end],
-        "test": shuffled[val_end:],
+    clip_keys = sorted(grouped_val)
+    random.Random(seed).shuffle(clip_keys)
+    val_group_count, test_group_count = _allocate_counts(len(clip_keys), (0.5, 0.5))
+    val_keys = set(clip_keys[:val_group_count])
+    test_keys = set(clip_keys[val_group_count : val_group_count + test_group_count])
+
+    split_map = {
+        "train": train_records,
+        "val": sorted(
+            (record for clip_key in val_keys for record in grouped_val[clip_key]),
+            key=lambda item: item.relative_path,
+        ),
+        "test": sorted(
+            (record for clip_key in test_keys for record in grouped_val[clip_key]),
+            key=lambda item: item.relative_path,
+        ),
     }
-
-    for split_name in split_records:
-        split_records[split_name].sort(key=lambda record: record.relative_path)
-    return split_records
+    return split_map
 
 
 def write_rows(path: Path, records: list[VideoRecord]) -> None:
@@ -149,14 +195,14 @@ def write_rows(path: Path, records: list[VideoRecord]) -> None:
 
 def build_summary(
     split_records: dict[str, list[VideoRecord]],
-    stats: dict[str, int],
+    stats: dict[str, dict[str, int]],
     seed: int,
 ) -> dict:
     summary = {
         "dataset": "AV-Deepfake1M",
-        "source_split": "val",
+        "source_splits": ["train", "val"],
         "selection": ["real.mp4", "fake_video_fake_audio.mp4"],
-        "split_strategy": "random_video_level",
+        "split_strategy": "official_train_plus_val_clip_holdout",
         "seed": seed,
         "source_stats": stats,
         "splits": {},
