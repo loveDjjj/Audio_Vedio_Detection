@@ -3,8 +3,8 @@
 本文档用于在服务器上按顺序运行当前仓库里的三个数据集分支。  
 环境约定：
 
-- `avhubert`：只用于 `dlib` 相关的 mouth ROI 预处理
-- `oneday`：用于 split 构建、数据下载、音频缓存、训练、绘图
+- `oneday`：只用于 `dlib` 相关的 mouth ROI 预处理
+- `avhubert`：用于 split 构建、数据下载、音频缓存、训练、绘图
 
 数据与权重路径约定：
 
@@ -12,6 +12,15 @@
 - FakeAVCeleb：`/data/OneDay/FakeAVCeleb`
 - MAVOS-DD：`/data/OneDay/MAVOS-DD`
 - AV-HuBERT 权重：`/data/OneDay/model/self_large_vox_433h.pt`
+
+服务器默认硬件配置：
+
+- GPU：`2 x RTX 4090 48G`
+- CPU：`72 cores`
+- 当前默认配置已按这套硬件更新为：
+  - 训练：`devices=[0,1]`
+  - 预处理：`devices=[0,1]`、`workers_per_device=3`、`cpu_threads_per_worker=8`
+  - 音频缓存：`num_procs=12`、`cpu_threads_per_worker=4`
 
 ## 1. 公共准备
 
@@ -24,7 +33,7 @@ cd ~/OneDay/Audio_Vedio_Detection
 如需下载 AV-HuBERT 权重：
 
 ```bash
-conda activate oneday
+conda activate avhubert
 python model/download_avhubert.py
 ```
 
@@ -55,7 +64,7 @@ ls /data/OneDay/model/self_large_vox_433h.pt
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate oneday
+conda activate avhubert
 python dataset/download_av1m_meta.py
 ```
 
@@ -67,7 +76,7 @@ python dataset/download_av1m_meta.py
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate oneday
+conda activate avhubert
 python dataset/build_av1m_official_real_fullfake_splits.py \
   --root /data/OneDay/AV-Deepfake1M \
   --output-dir splits/av1m_official_real_fullfake \
@@ -78,7 +87,7 @@ python dataset/build_av1m_official_real_fullfake_splits.py \
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate avhubert
+conda activate oneday
 python scripts/preprocess_av1m_mouth_roi.py
 ```
 
@@ -86,7 +95,7 @@ python scripts/preprocess_av1m_mouth_roi.py
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate oneday
+conda activate avhubert
 python scripts/cache_av1m_audio_features.py
 ```
 
@@ -94,7 +103,7 @@ python scripts/cache_av1m_audio_features.py
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate oneday
+conda activate avhubert
 python scripts/train_avhubert_classifier.py --config configs/avhubert_classifier.yaml
 ```
 
@@ -102,7 +111,7 @@ python scripts/train_avhubert_classifier.py --config configs/avhubert_classifier
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate oneday
+conda activate avhubert
 python scripts/plot_training_summary.py \
   --summary outputs/avhubert/av1m_official_real_fullfake/<timestamp>/summary.json
 ```
@@ -131,7 +140,7 @@ python scripts/plot_training_summary.py \
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate oneday
+conda activate avhubert
 python dataset/build_fakeavceleb_real_fullfake_splits.py \
   --root /data/OneDay/FakeAVCeleb \
   --output-dir splits/fakeavceleb_real_fullfake \
@@ -142,7 +151,7 @@ python dataset/build_fakeavceleb_real_fullfake_splits.py \
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate avhubert
+conda activate oneday
 python scripts/preprocess_fakeavceleb.py
 ```
 
@@ -150,7 +159,7 @@ python scripts/preprocess_fakeavceleb.py
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate oneday
+conda activate avhubert
 python scripts/cache_fakeavceleb_audio_features.py
 ```
 
@@ -158,7 +167,7 @@ python scripts/cache_fakeavceleb_audio_features.py
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate oneday
+conda activate avhubert
 python scripts/train_fakeavceleb.py
 ```
 
@@ -166,7 +175,7 @@ python scripts/train_fakeavceleb.py
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate oneday
+conda activate avhubert
 python scripts/plot_training_summary.py \
   --summary outputs/avhubert/fakeavceleb_real_fullfake/<timestamp>/summary.json
 ```
@@ -196,7 +205,7 @@ python scripts/plot_training_summary.py \
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate oneday
+conda activate avhubert
 python scripts/inspect_mavos_dd_metadata.py --metadata-root /data/OneDay/MAVOS-DD
 ```
 
@@ -204,7 +213,7 @@ python scripts/inspect_mavos_dd_metadata.py --metadata-root /data/OneDay/MAVOS-D
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate oneday
+conda activate avhubert
 python dataset/build_mavos_dd_real_fullfake_splits.py \
   --metadata-root /data/OneDay/MAVOS-DD \
   --output-dir splits/mavos_dd_real_fullfake
@@ -214,7 +223,7 @@ python dataset/build_mavos_dd_real_fullfake_splits.py \
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate oneday
+conda activate avhubert
 python dataset/download_mavos_dd_selected_files.py \
   --split-dir splits/mavos_dd_real_fullfake \
   --output-root /data/OneDay/MAVOS-DD
@@ -224,7 +233,7 @@ python dataset/download_mavos_dd_selected_files.py \
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate avhubert
+conda activate oneday
 python scripts/preprocess_mavos_dd_real_fullfake.py
 ```
 
@@ -232,7 +241,7 @@ python scripts/preprocess_mavos_dd_real_fullfake.py
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate oneday
+conda activate avhubert
 python scripts/cache_mavos_dd_real_fullfake_audio_features.py
 ```
 
@@ -240,7 +249,7 @@ python scripts/cache_mavos_dd_real_fullfake_audio_features.py
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate oneday
+conda activate avhubert
 python scripts/train_mavos_dd_real_fullfake.py
 ```
 
@@ -248,7 +257,7 @@ python scripts/train_mavos_dd_real_fullfake.py
 
 ```bash
 cd ~/OneDay/Audio_Vedio_Detection
-conda activate oneday
+conda activate avhubert
 python scripts/plot_mavos_dd_real_fullfake.py \
   --summary outputs/avhubert/mavos_dd_real_fullfake/<timestamp>/summary.json
 ```

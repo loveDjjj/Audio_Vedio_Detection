@@ -2,66 +2,59 @@
 
 ## 需求
 
-将仍保留历史命名的目录名和脚本名统一切换到新的全量协议命名，并删除旧 split 目录下的数据集 CSV/summary 工件。
+将三套数据集默认配置调整为适配 `2 x RTX 4090 48G + 72 CPU cores` 的服务器，并修正运行手册中的环境说明：`oneday` 用于 dlib 预处理，训练与其余脚本使用 `avhubert`。
 
 ## 修改文件
 
-- dataset/build_av1m_official_real_fullfake_splits.py
-- dataset/build_mavos_dd_real_fullfake_splits.py
-- dataset/download_mavos_dd_selected_files.py
 - configs/avhubert_classifier.yaml
 - configs/avhubert_preprocess.yaml
+- configs/fakeavceleb_classifier.yaml
+- configs/fakeavceleb_preprocess.yaml
 - configs/mavos_dd_real_fullfake_classifier.yaml
 - configs/mavos_dd_real_fullfake_preprocess.yaml
-- scripts/preprocess_mavos_dd_real_fullfake.py
-- scripts/cache_mavos_dd_real_fullfake_audio_features.py
-- scripts/train_mavos_dd_real_fullfake.py
-- scripts/plot_mavos_dd_real_fullfake.py
-- splits/av1m_official_real_fullfake/train.csv
-- splits/av1m_official_real_fullfake/val.csv
-- splits/av1m_official_real_fullfake/test.csv
-- splits/av1m_official_real_fullfake/summary.json
-- splits/mavos_dd_real_fullfake/train.csv
-- splits/mavos_dd_real_fullfake/val.csv
-- splits/mavos_dd_real_fullfake/test.csv
-- splits/mavos_dd_real_fullfake/summary.json
-- README.md
 - docs/full_dataset_runbook.md
 - docs/notes.md
 - docs/logs/2026-04.md
 
 ## 修改内容
 
-- AV1M：将 split builder 文件名改为 `build_av1m_official_real_fullfake_splits.py`，并将默认 `split_dir / artifact_root / output_root` 统一切换到 `av1m_official_real_fullfake`。
-- MAVOS-DD：将 builder、配置和 wrapper 脚本从 `english_small` 命名统一改为 `real_fullfake`；同时把默认 `split_dir / artifact_root / output_root` 全部切到 `mavos_dd_real_fullfake`。
-- split 工件：将已提交的 AV1M 与 MAVOS-DD `train.csv`、`val.csv`、`test.csv`、`summary.json` 迁移到新目录，并删除旧目录中的同名文件。
-- 文档：README 和运行手册改为新的脚本名、目录名和命令，不再保留“历史命名沿用”的说明。
+- 训练配置：将 AV1M、FakeAVCeleb、MAVOS-DD 三套训练配置的 `train.devices` 统一改为 `[0,1]`，并将 `num_workers` 从 `16` 调整为 `8`。
+- 音频缓存：将三套训练配置的 `audio_cache.num_procs` 从 `16` 调整为 `12`，保留 `cpu_threads_per_worker=4`。
+- 预处理配置：将三套预处理配置的 `runtime.devices` 统一改为 `[0,1]`，并调整为 `workers_per_device=3`、`cpu_threads_per_worker=8`。
+- 运行手册：将环境说明改为 `oneday` 仅用于 dlib mouth ROI 预处理，`avhubert` 用于 split 构建、数据下载、音频缓存、训练和绘图；同时补充当前默认硬件规格说明。
 
 ## 验证
 
 ```bash
-python dataset/build_av1m_official_real_fullfake_splits.py --help
-python dataset/build_mavos_dd_real_fullfake_splits.py --help
-python scripts/train_mavos_dd_real_fullfake.py --help
-python scripts/plot_mavos_dd_real_fullfake.py --help
-python -m unittest tests.test_av1m_fullfake_splits tests.test_fakeavceleb_subset tests.test_mavos_dd_subset -v
 python - <<'PY'
 from pathlib import Path
 from src.utils.project import load_config
 for path in (
     "configs/avhubert_classifier.yaml",
     "configs/avhubert_preprocess.yaml",
+    "configs/fakeavceleb_classifier.yaml",
+    "configs/fakeavceleb_preprocess.yaml",
     "configs/mavos_dd_real_fullfake_classifier.yaml",
     "configs/mavos_dd_real_fullfake_preprocess.yaml",
 ):
     cfg = load_config(Path(path))
-    print(path, cfg["paths"]["split_dir"])
+    print(path)
+    if "train" in cfg:
+        print("  train.devices =", cfg["train"]["devices"])
+        print("  train.num_workers =", cfg["train"]["num_workers"])
+        print("  audio_cache.num_procs =", cfg["audio_cache"]["num_procs"])
+        print("  audio_cache.cpu_threads_per_worker =", cfg["audio_cache"]["cpu_threads_per_worker"])
+    else:
+        print("  runtime.devices =", cfg["runtime"]["devices"])
+        print("  runtime.workers_per_device =", cfg["runtime"]["workers_per_device"])
+        print("  runtime.cpu_threads_per_worker =", cfg["runtime"]["cpu_threads_per_worker"])
 PY
+Get-Content docs/full_dataset_runbook.md
 ```
 
-结果：待验证。
+结果：通过。6 个配置文件都能正常解析，训练配置已统一为 `devices=[0,1]`、`num_workers=8`、`audio_cache.num_procs=12`，预处理配置已统一为 `devices=[0,1]`、`workers_per_device=3`、`cpu_threads_per_worker=8`；运行手册中的环境说明也已修正。
 
 ## Git
 
 - branch: `main`
-- commit: `refactor: rename full-protocol dataset entrypoints`
+- commit: `chore: retune configs for 2x4090 host`

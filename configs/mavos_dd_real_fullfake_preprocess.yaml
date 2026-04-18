@@ -27,9 +27,10 @@ preprocess:
   strict: true
 
 runtime:
-  devices: [0,1,2,3,4,5,6,7]
-  workers_per_device: 2
-  cpu_threads_per_worker: 4
+  # Default for a 2x4090 48G + 72-core host.
+  devices: [0,1]
+  workers_per_device: 3
+  cpu_threads_per_worker: 8
   start_method: spawn
   show_main_progress: true
   show_worker_logs: false
