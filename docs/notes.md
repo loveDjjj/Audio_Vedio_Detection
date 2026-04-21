@@ -1,32 +1,62 @@
 # Notes
 
-## 需求
-修复 `train_fakeavceleb.py` 在服务器上加载 AV-HuBERT backbone 时，因为新版 fairseq 需要 `pos_conv_depth` 等新字段而导致的模型构建失败。
+## Request
+Document the current training framework and preprocess framework in a dedicated Markdown file, and add detailed Chinese comments to every config under `configs/*.yaml`.
 
-## 修改文件
+The required scope is:
 
-- src/models/avhubert_backbone.py
-- tests/test_avhubert_env.py
+1. Explain the end-to-end preprocess and training pipeline step by step.
+2. Explain which stages mainly run on CPU and which mainly run on GPU.
+3. Explain required environments and runtime dependencies.
+4. Explain the inputs and outputs of each stage.
+5. Explain the current default configuration sizes.
+6. Add detailed Chinese comments to all 9 YAML files under `configs/`.
+
+## Modified Files
+
+- configs/avhubert_classifier.yaml
+- configs/avhubert_preprocess.yaml
+- configs/avhubert_preprocess_align.yaml
+- configs/fakeavceleb_classifier.yaml
+- configs/fakeavceleb_preprocess.yaml
+- configs/fakeavceleb_preprocess_align.yaml
+- configs/mavos_dd_real_fullfake_classifier.yaml
+- configs/mavos_dd_real_fullfake_preprocess.yaml
+- configs/mavos_dd_real_fullfake_preprocess_align.yaml
+- docs/training_framework.md
+- docs/superpowers/plans/2026-04-20-training-framework-docs-and-yaml-comments.md
 - docs/notes.md
 - docs/logs/2026-04.md
 
-## 修改内容
+## Changes
 
-- 在 `src/models/avhubert_backbone.py` 中新增 `_merge_model_config_defaults()`，构建 backbone 配置时先合并 fairseq `Wav2Vec2Config` 默认值，再合并 `AVHubertConfig` 默认值，最后覆盖 checkpoint 里的旧配置。
-- 对旧 AV-HuBERT checkpoint 缺失的新版 fairseq 字段补兼容默认值：`pos_conv_depth=1`、`conv_pos_batch_norm=False`，避免 `TransformerEncoder` 初始化时因 `None > 1` 直接崩溃。
-- 保留原有 checkpoint 读取兼容逻辑，不改训练流程、不改模型参数语义，只修配置适配层。
-- 在 `tests/test_avhubert_env.py` 中补充模型配置兼容分支测试，覆盖“旧 checkpoint 不含新版 fairseq 字段时自动回填”的行为。
+- Added detailed Chinese comments to all 9 config files under `configs/`, covering section purpose, path roles, CPU/GPU placement, per-process/per-GPU semantics, and default value meaning.
+- Added `docs/training_framework.md` to document the shared split -> manifest -> detect -> align -> audio cache -> dataset -> frozen AV-HuBERT linear probe -> train/val/test pipeline.
+- Documented the current server environment split in the framework doc: `oneday` for preprocess, `avhubert` for training, and the current server caveat that audio cache has been validated in `oneday` because it contains `python_speech_features`.
+- Summarized each stage's inputs, outputs, compute placement, and default configuration values in one place.
+- Wrote an implementation plan file under `docs/superpowers/plans/` before making the changes.
 
-## 验证
+## Verification
 
 ```bash
-python -m py_compile src/models/avhubert_backbone.py tests/test_avhubert_env.py
-python -m unittest tests.test_avhubert_env -v
+python - <<'PY'
+from pathlib import Path
+from src.utils.project import load_config
+for path in sorted(Path("configs").glob("*.yaml")):
+    cfg = load_config(path)
+    print(path.as_posix(), sorted(cfg.keys()))
+PY
+
+python scripts/preprocess_av1m_mouth_roi.py --help
+python scripts/preprocess_fakeavceleb.py --help
+python scripts/preprocess_mavos_dd_real_fullfake.py --help
+python scripts/train_fakeavceleb.py --help
+python scripts/train_mavos_dd_real_fullfake.py --help
 ```
 
-结果：通过。语法检查通过；当前本地环境缺少 `torch`，`tests.test_avhubert_env` 的 4 个用例均被正确 skip，没有出现新的导入或语法错误。
+Result: pass. All 9 config files load successfully, and the main preprocess/train wrapper entrypoints still print help normally after the YAML comment updates.
 
 ## Git
 
 - branch: `main`
-- commit: `fix: backfill fairseq config defaults for avhubert`
+- commit: `docs: document training framework and annotate configs`

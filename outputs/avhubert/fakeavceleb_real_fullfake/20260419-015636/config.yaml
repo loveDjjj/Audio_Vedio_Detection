@@ -1,0 +1,70 @@
+experiment_name: fakeavceleb_real_fullfake_avhubert
+
+paths:
+  # Linux host data root lives under /data/OneDay.
+  dataset_root: /data/OneDay/FakeAVCeleb
+  raw_video_root: /data/OneDay/FakeAVCeleb
+  split_dir: splits/fakeavceleb_real_fullfake
+  artifact_root: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake
+  manifest_dir: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/manifests
+  landmark_dir: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/landmarks
+  mouth_roi_root: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/mouth_roi
+  audio_feature_root: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/audio_features
+  output_root: outputs/avhubert/fakeavceleb_real_fullfake
+  # Shared AV-HuBERT checkpoint is stored outside the repo under /data/OneDay/model.
+  checkpoint_path: /data/OneDay/model/self_large_vox_433h.pt
+  avhubert_repo: third_party/av_hubert
+  ffmpeg_path: /usr/bin/ffmpeg
+  cnn_detector_path: resources/dlib/mmod_human_face_detector.dat
+  face_predictor_path: resources/dlib/shape_predictor_68_face_landmarks.dat
+  mean_face_path: resources/avhubert/20words_mean_face.npy
+
+data:
+  max_frames: 300
+  pad_to_batch_max: true
+  image_crop_size: 88
+  image_mean: 0.421
+  image_std: 0.165
+  horizontal_flip_prob: 0.5
+  shuffle_train: true
+  drop_last_train: false
+
+model:
+  freeze_backbone: true
+
+train:
+  seed: 42
+  # Default host: 2 x RTX 4090 48G.
+  devices: [0, 1]
+  backend: nccl
+  master_addr: 127.0.0.1
+  master_port: 29501
+  epochs: 10
+  batch_size: 16
+  num_workers: 12
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  grad_clip_norm: 5.0
+  amp: false
+  log_interval: 20
+
+audio_cache:
+  # Tuned for a 72-core host while leaving headroom for ffmpeg and I/O.
+  num_procs: 12
+  cpu_threads_per_worker: 4
+  start_method: spawn
+  show_progress: true
+  stack_order_audio: 4
+
+logging:
+  level: INFO
+  train_log_filename: train.log
+  rank_log_filename_template: train_rank{rank}.log
+  audio_cache_log_filename: audio_cache.log
+  audio_cache_rank_log_filename_template: audio_cache_rank{rank}.log
+  show_progress: true
+  show_rank_logs: false
+
+visualization:
+  enabled: true
+  output_filename: training_curves.png

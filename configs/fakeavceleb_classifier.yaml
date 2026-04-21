@@ -1,46 +1,94 @@
+# 当前训练实验名，仅用于日志和产物命名。
 experiment_name: fakeavceleb_real_fullfake_avhubert
 
+# FakeAVCeleb 全量 real/real vs fake/fake 协议的输入输出路径。
 paths:
-  # Linux host data root lives under /data/OneDay.
+  # 原始数据集根目录，保留用于人工排查和整体定位。
   dataset_root: /data/OneDay/FakeAVCeleb
+  # 原始 mp4 根目录；audio cache 和训练前缺失检查直接从这里读取。
   raw_video_root: /data/OneDay/FakeAVCeleb
+  # split builder 生成的 train/val/test CSV。
   split_dir: splits/fakeavceleb_real_fullfake
+  # 当前协议所有中间产物的总根目录。
   artifact_root: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake
+  # split CSV 转换得到的 manifest 列表目录。
   manifest_dir: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/manifests
+  # detect 阶段保存 landmarks 的目录。
   landmark_dir: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/landmarks
+  # align 阶段输出的 mouth ROI 视频目录，也是训练阶段真正读取的视频输入。
   mouth_roi_root: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/mouth_roi
+  # audio cache 生成的堆叠音频特征目录，也是训练阶段真正读取的音频输入。
   audio_feature_root: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/audio_features
+  # 最终训练 run 输出目录；脚本会在其下再创建时间戳子目录。
   output_root: outputs/avhubert/fakeavceleb_real_fullfake
-  # Shared AV-HuBERT checkpoint is stored outside the repo under /data/OneDay/model.
+  # 共用的 AV-HuBERT 预训练权重。
   checkpoint_path: /data/OneDay/model/self_large_vox_433h.pt
+  # AV-HuBERT / fairseq 第三方代码目录。
   avhubert_repo: third_party/av_hubert
+  # 音频缓存阶段调用的 ffmpeg 路径。
   ffmpeg_path: /usr/bin/ffmpeg
+  # detect 阶段的 dlib CNN 检测器。
   cnn_detector_path: resources/dlib/mmod_human_face_detector.dat
+  # detect 阶段的 dlib 68 点关键点回归器。
   face_predictor_path: resources/dlib/shape_predictor_68_face_landmarks.dat
+  # align 阶段使用的均值脸模板。
   mean_face_path: resources/avhubert/20words_mean_face.npy
 
+# 供 manifest 生成与流程说明复用的预处理元信息。
+preprocess:
+  # 需要转为 manifest 的 split 名称。
+  manifest_names:
+    - train
+    - val
+    - test
+  # 与旧版预处理脚本兼容保留，当前训练主脚本不直接使用。
+  nshard: 1
+  rank: 0
+  # mouth ROI 视频的目标尺寸。
+  crop_width: 96
+  crop_height: 96
+  # 68 点关键点中用于嘴部区域的索引范围。
+  start_idx: 48
+  stop_idx: 68
+  # 关键点时序平滑窗口。
+  window_margin: 12
+  # mouth ROI 写盘帧率。
+  fps: 25
+  # 是否保留 landmarks 中间文件。
+  save_landmarks: true
+  # 预处理失败是否按严格模式记录。
+  strict: true
+
+# 训练时的数据变换和 batch 行为。
 data:
   max_frames: 300
   pad_to_batch_max: true
+  # AV-HuBERT 图像输入裁剪边长。
   image_crop_size: 88
+  # mouth ROI 灰度归一化参数。
   image_mean: 0.421
   image_std: 0.165
+  # 仅训练集启用的水平翻转增强。
   horizontal_flip_prob: 0.5
   shuffle_train: true
   drop_last_train: false
 
+# 模型结构约束：冻结主干，只训练线性头。
 model:
   freeze_backbone: true
 
+# GPU 训练配置。
 train:
   seed: 42
-  # Default host: 2 x RTX 4090 48G.
+  # 当前默认按 2 张 4090 配置，多卡时自动启用 DDP。
   devices: [0,1]
   backend: nccl
   master_addr: 127.0.0.1
   master_port: 29501
   epochs: 10
+  # 每张 GPU 的 batch size。
   batch_size: 4
+  # 每个训练进程的数据加载 worker 数。
   num_workers: 8
   learning_rate: 0.001
   weight_decay: 0.0001
@@ -48,14 +96,18 @@ train:
   amp: false
   log_interval: 20
 
+# CPU 音频缓存配置。
 audio_cache:
-  # Tuned for a 72-core host while leaving headroom for ffmpeg and I/O.
+  # 总并发进程数。
   num_procs: 12
+  # 每个 worker 的 CPU 线程上限。
   cpu_threads_per_worker: 4
   start_method: spawn
   show_progress: true
+  # 4 x 26 = 104 维，与 AV-HuBERT checkpoint metadata 对齐。
   stack_order_audio: 4
 
+# 日志与可视化输出。
 logging:
   level: INFO
   train_log_filename: train.log

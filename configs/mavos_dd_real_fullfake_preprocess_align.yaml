@@ -1,15 +1,14 @@
-# MAVOS-DD 预处理 detect 阶段配置。
+# MAVOS-DD 预处理 align 阶段配置。
 
 paths:
   split_dir: splits/mavos_dd_real_fullfake
-  # 原始视频根目录。
+  # align 阶段会重新读取原始视频，以 landmarks 为条件执行嘴部裁剪与重编码。
   raw_video_root: /data/OneDay/MAVOS-DD
-  # 当前协议所有预处理中间产物的根目录。
   artifact_root: /data/OneDay/artifacts/avhubert/mavos_dd_real_fullfake
   manifest_dir: /data/OneDay/artifacts/avhubert/mavos_dd_real_fullfake/manifests
-  # detect 阶段输出 landmarks 的目录。
+  # detect 阶段生成的 landmarks 缓存目录。
   landmark_dir: /data/OneDay/artifacts/avhubert/mavos_dd_real_fullfake/landmarks
-  # align 阶段输出 mouth ROI 的目录。
+  # align 阶段最终写出的 mouth ROI 视频目录。
   mouth_roi_root: /data/OneDay/artifacts/avhubert/mavos_dd_real_fullfake/mouth_roi
   cnn_detector_path: resources/dlib/mmod_human_face_detector.dat
   face_predictor_path: resources/dlib/shape_predictor_68_face_landmarks.dat
@@ -21,8 +20,8 @@ preprocess:
     - val
     - test
   manifest_name: all
-  # detect 阶段：GPU 进行人脸检测，CPU 完成关键点回归和 landmarks 写盘。
-  stage: detect
+  # align 阶段：CPU-only，读取 landmarks 后执行对齐、裁剪和视频写盘。
+  stage: align
   crop_width: 96
   crop_height: 96
   start_idx: 48
@@ -34,8 +33,10 @@ preprocess:
   detector_batch_size: 32
 
 runtime:
-  devices: [0,1]
-  workers_per_device: 3
+  # align 不要求 GPU，因此 devices 为空。
+  devices: []
+  # CPU-only 情况下总 worker 数为 6。
+  workers_per_device: 6
   cpu_threads_per_worker: 8
   start_method: spawn
   show_main_progress: true

@@ -1,89 +1,148 @@
+# 当前训练实验名，仅用于日志和产物标识。
 experiment_name: av1m_official_real_fullfake_avhubert
 
+# 训练链路读写的全部路径。
+# 这里同时覆盖原始数据、预处理中间产物、音频缓存、最终训练输出和共享资源。
 paths:
-  # Linux host data root lives under /data/OneDay.
+  # 数据集根目录，主要用于人工排查和文档说明；训练主链路直接依赖下面的 raw/split/artifact 路径。
   dataset_root: /data/OneDay/AV-Deepfake1M
-  # Full-protocol AV1M splits now store train/ and val/ prefixes in relative_path.
+  # 原始 mp4 根目录。
+  # 训练前的数据缺失检查和 audio cache 都直接从这里读取原始视频。
   raw_video_root: /data/OneDay/AV-Deepfake1M
+  # split builder 生成的 train/val/test CSV 所在目录，是整条训练链的样本清单入口。
   split_dir: splits/av1m_official_real_fullfake
+  # 当前数据集协议的中间产物总根目录。
   artifact_root: /data/OneDay/artifacts/avhubert/av1m_official_real_fullfake
+  # 由 split CSV 生成的 manifest 列表目录，供预处理并行切分和调试使用。
   manifest_dir: /data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/manifests
+  # detect 阶段输出的人脸关键点缓存目录。
   landmark_dir: /data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/landmarks
+  # align 阶段输出的 mouth ROI 视频目录，也是训练阶段真正读取的视频输入。
   mouth_roi_root: /data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/mouth_roi
+  # audio cache 输出的堆叠 logfbank 特征目录，也是训练阶段真正读取的音频输入。
   audio_feature_root: /data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/audio_features
+  # 每次训练 run 的最终输出目录；脚本会在其下自动创建时间戳子目录。
   output_root: outputs/avhubert/av1m_official_real_fullfake
-  # Shared AV-HuBERT checkpoint is stored outside the repo under /data/OneDay/model.
+  # 冻结的 AV-HuBERT 主干权重。
   checkpoint_path: /data/OneDay/model/self_large_vox_433h.pt
+  # AV-HuBERT / fairseq 第三方代码根目录，dataset 与 backbone 加载都依赖它。
   avhubert_repo: third_party/av_hubert
+  # audio cache 调用 ffmpeg 抽取 16kHz 单声道音频时使用的可执行文件。
   ffmpeg_path: /usr/bin/ffmpeg
+  # detect 阶段使用的 dlib CNN 人脸检测器权重。
   cnn_detector_path: resources/dlib/mmod_human_face_detector.dat
+  # detect 阶段使用的 dlib 68 点关键点回归器权重。
   face_predictor_path: resources/dlib/shape_predictor_68_face_landmarks.dat
+  # align 阶段执行标准人脸对齐时使用的 AV-HuBERT 均值脸模板。
   mean_face_path: resources/avhubert/20words_mean_face.npy
 
+# 与 manifest 生成复用的预处理元信息。
+# 训练主脚本本身不会执行 detect/align，但 build_avhubert_manifests.py 会读取这里的 manifest_names。
 preprocess:
+  # 需要从 split_dir 下转换为 manifest 的 split 名称。
   manifest_names:
     - train
     - val
     - test
+  # 兼容旧版预处理配置保留的分片参数；当前训练主链路不直接使用。
   nshard: 1
   rank: 0
+  # mouth ROI 的目标分辨率，和预处理配置保持一致，便于统一说明。
   crop_width: 96
   crop_height: 96
+  # 68 点关键点中用于嘴部裁剪的索引范围，48:68 即嘴部区域。
   start_idx: 48
   stop_idx: 68
+  # 对齐时用于时序平滑的窗口长度。
   window_margin: 12
+  # 预处理写 mouth ROI 视频时使用的输出帧率。
   fps: 25
+  # 是否保留 landmarks 中间文件。
   save_landmarks: true
+  # 预处理遇到异常时是否按严格模式记为失败。
   strict: true
 
+# 训练阶段的数据读取、裁剪和 batch 组织参数。
 data:
+  # 单样本最多保留多少帧；超过部分在 collate 时截断。
   max_frames: 300
+  # 是否把一个 batch 内的样本补齐到该 batch 的最大长度。
   pad_to_batch_max: true
+  # AV-HuBERT 图像输入裁剪到的最终边长；训练/验证都依赖这个尺寸。
   image_crop_size: 88
+  # mouth ROI 灰度归一化均值和标准差，沿用 AV-HuBERT 常用设置。
   image_mean: 0.421
   image_std: 0.165
+  # 仅训练集启用的水平翻转概率。
   horizontal_flip_prob: 0.5
+  # 训练集是否打乱；验证和测试固定不打乱。
   shuffle_train: true
+  # 训练 DataLoader 是否丢弃最后一个不足 batch 的尾批。
   drop_last_train: false
 
+# 模型结构约束。
 model:
-  # SSR-DFD baseline: frozen AV-HuBERT backbone + shared Linear(1024, 1) probe.
+  # 当前 baseline 固定为冻结 AV-HuBERT 主干，只训练一个 Linear(1024, 1) 分类头。
   freeze_backbone: true
 
+# 训练运行时参数。
 train:
+  # 全局随机种子；DDP 下每个 rank 会在此基础上加 rank 偏移。
   seed: 42
-  # Default host: 2 x RTX 4090 48G. DDP is enabled automatically when len(devices) > 1.
+  # 参与训练的 CUDA 设备编号列表；长度大于 1 时自动进入 DDP。
   devices: [0,1]
+  # 多卡训练使用的分布式后端；NVIDIA GPU 默认使用 NCCL。
   backend: nccl
+  # DDP 主进程地址和端口；同机多卡时默认用本机回环地址。
   master_addr: 127.0.0.1
   master_port: 29501
+  # 总训练轮数。
   epochs: 10
-  # Per-GPU batch size and per-process DataLoader workers.
+  # 每张 GPU 的 batch size，不是全局 batch size。
   batch_size: 4
+  # 每个训练进程各自启动的 DataLoader worker 数。
   num_workers: 8
+  # AdamW 学习率和权重衰减。
   learning_rate: 0.001
   weight_decay: 0.0001
+  # 梯度裁剪阈值，0 表示不裁剪。
   grad_clip_norm: 5.0
+  # 是否启用 AMP 混合精度；当前默认关闭以求更稳。
   amp: false
+  # 训练阶段每隔多少 step 打一次 loss 日志。
   log_interval: 20
 
+# 音频缓存参数。
+# 这一阶段完全在 CPU 上运行，但会调用 ffmpeg 子进程和 numpy/python_speech_features。
 audio_cache:
-  # Tuned for a 72-core host while leaving headroom for ffmpeg and I/O.
+  # 并发 worker 进程数；这是全局进程数，不是每卡数。
   num_procs: 12
+  # 每个音频缓存 worker 限制的 CPU 线程数，用于控制 ffmpeg / BLAS 线程爆炸。
   cpu_threads_per_worker: 4
+  # 多进程启动方式；与预处理保持一致，默认使用 spawn。
   start_method: spawn
+  # 是否显示整体进度条。
   show_progress: true
+  # 将连续 4 帧 26 维 logfbank 堆叠成 104 维 AV-HuBERT 音频输入。
   stack_order_audio: 4
 
+# 训练和音频缓存日志文件命名。
 logging:
   level: INFO
+  # 主 rank 的训练日志文件。
   train_log_filename: train.log
+  # 非主 rank 的训练日志文件模板。
   rank_log_filename_template: train_rank{rank}.log
+  # 音频缓存主日志文件。
   audio_cache_log_filename: audio_cache.log
+  # 音频缓存分片 worker 日志文件模板。
   audio_cache_rank_log_filename_template: audio_cache_rank{rank}.log
+  # 是否显示训练/验证/测试 tqdm 进度条。
   show_progress: true
+  # 是否在控制台打印非主 rank 日志。
   show_rank_logs: false
 
+# 训练结束后根据 summary.json 生成曲线图的配置。
 visualization:
   enabled: true
   output_filename: training_curves.png

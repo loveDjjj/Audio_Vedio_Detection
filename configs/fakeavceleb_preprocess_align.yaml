@@ -1,16 +1,13 @@
-# FakeAVCeleb 预处理 detect 阶段配置。
+# FakeAVCeleb 预处理 align 阶段配置。
 
 paths:
-  # split CSV 目录；manifest 会从这里生成。
   split_dir: splits/fakeavceleb_real_fullfake
-  # 原始视频根目录。
+  # align 阶段仍然需要原始视频来执行几何对齐与嘴部裁剪。
   raw_video_root: /data/OneDay/FakeAVCeleb
-  # 当前协议所有预处理产物的根目录。
   artifact_root: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake
   manifest_dir: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/manifests
-  # detect 阶段输出 landmarks 的目录。
+  # 这里的 landmarks 必须先由 detect 阶段生成。
   landmark_dir: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/landmarks
-  # align 阶段输出 mouth ROI 的目录。
   mouth_roi_root: /data/OneDay/artifacts/avhubert/fakeavceleb_real_fullfake/mouth_roi
   cnn_detector_path: resources/dlib/mmod_human_face_detector.dat
   face_predictor_path: resources/dlib/shape_predictor_68_face_landmarks.dat
@@ -22,8 +19,8 @@ preprocess:
     - val
     - test
   manifest_name: all
-  # detect 阶段：GPU 做人脸检测，CPU 做关键点回归与 landmarks 落盘。
-  stage: detect
+  # align 阶段只读取 landmarks 并生成 mouth ROI，不再触发 dlib 检测。
+  stage: align
   crop_width: 96
   crop_height: 96
   start_idx: 48
@@ -32,15 +29,13 @@ preprocess:
   fps: 25
   save_landmarks: true
   strict: true
-  # 单个 worker 内部的 dlib CNN 帧批大小。
   detector_batch_size: 32
 
 runtime:
-  # 当前默认使用 2 张 GPU 做 detect。
-  devices: [0,1]
-  # 每张 GPU 运行 3 个 worker，总 worker 数为 6。
-  workers_per_device: 3
-  # 每个 worker 的 CPU 线程预算。
+  # CPU-only align，因此这里不配置 GPU。
+  devices: []
+  # 总 worker 数直接等于 6。
+  workers_per_device: 6
   cpu_threads_per_worker: 8
   start_method: spawn
   show_main_progress: true

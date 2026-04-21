@@ -1,42 +1,73 @@
+# AV1M 预处理 detect 阶段配置。
+# 当前默认入口就是 detect：读取原始 mp4 -> 生成人脸 landmarks。
+
 paths:
+  # split CSV 所在目录；预处理会先根据这里的 train/val/test.csv 生成 manifest。
   split_dir: splits/av1m_official_real_fullfake
-  # Linux host data root lives under /data/OneDay.
-  # Full-protocol AV1M splits now store train/ and val/ prefixes in relative_path.
+  # 原始视频根目录；detect 阶段从这里读取 mp4。
   raw_video_root: /data/OneDay/AV-Deepfake1M
+  # 当前协议所有预处理产物的根目录。
   artifact_root: /data/OneDay/artifacts/avhubert/av1m_official_real_fullfake
+  # manifest 输出目录；run_preprocess_from_config() 会自动生成 all.list 等文件。
   manifest_dir: /data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/manifests
+  # detect 阶段 landmarks 输出目录。
   landmark_dir: /data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/landmarks
+  # align 阶段 mouth ROI 输出目录；detect 阶段本身不会写这里。
   mouth_roi_root: /data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/mouth_roi
+  # dlib CNN 人脸检测器权重。
   cnn_detector_path: resources/dlib/mmod_human_face_detector.dat
+  # dlib 68 点关键点回归器权重。
   face_predictor_path: resources/dlib/shape_predictor_68_face_landmarks.dat
+  # 对齐模板；detect 阶段通常不会真正用到，但为共享流程保留。
   mean_face_path: resources/avhubert/20words_mean_face.npy
 
+# 预处理本体参数。
 preprocess:
+  # 先从这三个 split CSV 生成 manifest。
   split_names:
     - train
     - val
     - test
+  # 最终执行的 manifest 文件名；all 表示把 train/val/test 合并为一个任务列表。
   manifest_name: all
-  stage: all
+  # detect 阶段：GPU 上做人脸检测，CPU 上做关键点回归与写 landmarks。
+  stage: detect
+  # mouth ROI 目标宽高；即使 detect 阶段不裁剪，也与 align 保持一致便于复用说明。
   crop_width: 96
   crop_height: 96
+  # 嘴部关键点索引范围，48:68 对应 68 点中的嘴部区域。
   start_idx: 48
   stop_idx: 68
+  # 时序平滑窗口长度，align 时会用到。
   window_margin: 12
+  # align 阶段写视频时的输出帧率。
   fps: 25
+  # detect 阶段是否把 landmarks 落盘；当前应保持 true，否则 align 无法继续。
   save_landmarks: true
+  # 是否将读取失败/无脸等情况记为严格失败。
   strict: true
+  # dlib CNN 检测批大小；这是单个 worker 内部的帧批量，不是跨进程的全局批量。
+  detector_batch_size: 32
 
+# 预处理并发配置。
 runtime:
-  # Default for a 2x4090 48G + 72-core host.
+  # detect 阶段实际使用的 GPU 列表。
   devices: [0, 1]
+  # 每张 GPU 挂多少个预处理 worker；总 worker 数 = 设备数 x workers_per_device。
   workers_per_device: 3
+  # 每个 worker 的 CPU 线程预算；用于视频解码、landmark 后处理和 numpy/skimage 运算。
   cpu_threads_per_worker: 8
+  # 多进程启动方式。
   start_method: spawn
+  # 是否显示主进程总体进度条。
   show_main_progress: true
+  # 是否在控制台打印各 worker 的详细日志。
   show_worker_logs: false
 
+# 预处理日志文件命名。
 logging:
   level: INFO
+  # 主进程日志。
   main_log_filename: preprocess.log
+  # 每个分片 worker 的日志。
   worker_log_filename_template: preprocess_rank{rank}.log

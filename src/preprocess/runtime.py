@@ -31,38 +31,64 @@ SUMMARY_KEYS = [
 ]
 
 
-def build_worker_assignments(devices: list[int], workers_per_device: int) -> list[dict[str, int]]:
-    if not devices:
-        raise ValueError("runtime.devices must contain at least one CUDA device index.")
+def stage_uses_cuda(stage: str) -> bool:
+    if stage not in {"all", "detect", "align"}:
+        raise ValueError(f"Unsupported preprocess stage: {stage}")
+    return stage in {"all", "detect"}
+
+
+def build_worker_assignments(
+    devices: list[int],
+    workers_per_device: int,
+    stage: str,
+) -> list[dict[str, int | None]]:
     if workers_per_device < 1:
         raise ValueError("runtime.workers_per_device must be >= 1.")
 
-    nshard = len(devices) * workers_per_device
+    if stage_uses_cuda(stage):
+        if not devices:
+            raise ValueError("runtime.devices must contain at least one CUDA device index.")
+        nshard = len(devices) * workers_per_device
+    else:
+        nshard = max(1, len(devices)) * workers_per_device
+
     assignments: list[dict[str, int]] = []
-    rank = 0
-    for _ in range(workers_per_device):
-        for device_index in devices:
-            assignments.append(
-                {
-                    "rank": rank,
-                    "nshard": nshard,
-                    "device_index": int(device_index),
-                }
-            )
-            rank += 1
+    if stage_uses_cuda(stage):
+        rank = 0
+        for _ in range(workers_per_device):
+            for device_index in devices:
+                assignments.append(
+                    {
+                        "rank": rank,
+                        "nshard": nshard,
+                        "device_index": int(device_index),
+                    }
+                )
+                rank += 1
+    else:
+        assignments = [
+            {
+                "rank": rank,
+                "nshard": nshard,
+                "device_index": None,
+            }
+            for rank in range(nshard)
+        ]
     return assignments
 
 
-def build_worker_environment(device_index: int, cpu_threads_per_worker: int) -> dict[str, str]:
+def build_worker_environment(device_index: int | None, cpu_threads_per_worker: int) -> dict[str, str]:
     thread_count = str(cpu_threads_per_worker)
-    return {
-        "CUDA_DEVICE_ORDER": "PCI_BUS_ID",
-        "CUDA_VISIBLE_DEVICES": str(device_index),
+    environment = {
         "OMP_NUM_THREADS": thread_count,
         "MKL_NUM_THREADS": thread_count,
         "NUMEXPR_NUM_THREADS": thread_count,
         "OPENBLAS_NUM_THREADS": thread_count,
     }
+    if device_index is not None:
+        environment["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+        environment["CUDA_VISIBLE_DEVICES"] = str(device_index)
+    return environment
 
 
 def aggregate_shard_summaries(shard_summaries: list[dict]) -> dict:
@@ -126,7 +152,7 @@ def _run_preprocess_shard(
     config_path: str,
     rank: int,
     nshard: int,
-    device_index: int,
+    device_index: int | None,
     cpu_threads_per_worker: int,
     progress_queue=None,
 ) -> dict:
@@ -149,10 +175,10 @@ def _run_preprocess_shard(
         console=False,
     )
     logger.info(
-        "Starting shard rank=%s/%s on cuda:%s with cpu_threads_per_worker=%s",
+        "Starting shard rank=%s/%s on %s with cpu_threads_per_worker=%s",
         rank,
         nshard,
-        device_index,
+        f"cuda:{device_index}" if device_index is not None else "cpu",
         cpu_threads_per_worker,
     )
 
@@ -175,6 +201,7 @@ def _run_preprocess_shard(
         stage=preprocess_cfg["stage"],
         save_landmarks=preprocess_cfg["save_landmarks"],
         strict=preprocess_cfg["strict"],
+        detector_batch_size=int(preprocess_cfg.get("detector_batch_size", 32)),
         show_progress=False,
         progress_callback=lambda _file_id: _emit_progress(progress_queue, rank),
     )
@@ -209,8 +236,10 @@ def run_preprocess_from_config(config_path: Path = DEFAULT_PREPROCESS_CONFIG_PAT
     workers_per_device = int(runtime_cfg["workers_per_device"])
     cpu_threads_per_worker = int(runtime_cfg["cpu_threads_per_worker"])
     show_main_progress = bool(runtime_cfg.get("show_main_progress", True))
-    _validate_devices(devices)
-    assignments = build_worker_assignments(devices=devices, workers_per_device=workers_per_device)
+    stage = config["preprocess"]["stage"]
+    if stage_uses_cuda(stage):
+        _validate_devices(devices)
+    assignments = build_worker_assignments(devices=devices, workers_per_device=workers_per_device, stage=stage)
     logger.info(
         "Preprocess config=%s manifest=%s devices=%s workers_per_device=%s cpu_threads_per_worker=%s",
         resolve_path(config_path),

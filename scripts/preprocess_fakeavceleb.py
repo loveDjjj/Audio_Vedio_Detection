@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -12,8 +13,20 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.preprocess.runtime import run_preprocess_from_config
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run FakeAVCeleb mouth ROI preprocessing from a YAML config.")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path("configs/fakeavceleb_preprocess.yaml"),
+        help="Path to the preprocess YAML config.",
+    )
+    return parser.parse_args()
+
+
 def main() -> int:
-    summary = run_preprocess_from_config(Path("configs/fakeavceleb_preprocess.yaml"))
+    args = parse_args()
+    summary = run_preprocess_from_config(args.config)
     print(json.dumps(summary, indent=2, ensure_ascii=False))
     return 0
 

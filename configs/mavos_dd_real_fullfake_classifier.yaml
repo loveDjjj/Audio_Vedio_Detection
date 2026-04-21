@@ -1,24 +1,58 @@
+# 当前训练实验名，仅用于日志和训练产物目录标识。
 experiment_name: mavos_dd_real_fullfake_avhubert
 
+# MAVOS-DD 全量 real/real vs fake/fake 协议的输入输出路径。
 paths:
-  # Linux host data root lives under /data/OneDay.
+  # MAVOS-DD 数据根目录；metadata 和视频文件都默认放在这里。
   dataset_root: /data/OneDay/MAVOS-DD
+  # 原始视频根目录；audio cache 与训练前缺失检查从这里读取 mp4。
   raw_video_root: /data/OneDay/MAVOS-DD
+  # 官方 split 过滤后的 train/val/test CSV。
   split_dir: splits/mavos_dd_real_fullfake
+  # 当前协议所有中间产物的根目录。
   artifact_root: /data/OneDay/artifacts/avhubert/mavos_dd_real_fullfake
+  # split CSV 转换得到的 manifest 列表目录。
   manifest_dir: /data/OneDay/artifacts/avhubert/mavos_dd_real_fullfake/manifests
+  # detect 阶段写 landmarks 的目录。
   landmark_dir: /data/OneDay/artifacts/avhubert/mavos_dd_real_fullfake/landmarks
+  # align 阶段写 mouth ROI 视频的目录，也是训练视频输入。
   mouth_roi_root: /data/OneDay/artifacts/avhubert/mavos_dd_real_fullfake/mouth_roi
+  # audio cache 写 stacked logfbank 的目录，也是训练音频输入。
   audio_feature_root: /data/OneDay/artifacts/avhubert/mavos_dd_real_fullfake/audio_features
+  # 每次训练 run 的最终输出目录。
   output_root: outputs/avhubert/mavos_dd_real_fullfake
-  # Shared AV-HuBERT checkpoint is stored outside the repo under /data/OneDay/model.
+  # 共享的 AV-HuBERT 主干权重。
   checkpoint_path: /data/OneDay/model/self_large_vox_433h.pt
+  # 第三方 AV-HuBERT / fairseq 代码根目录。
   avhubert_repo: third_party/av_hubert
+  # audio cache 调用的 ffmpeg 路径。
   ffmpeg_path: /usr/bin/ffmpeg
+  # detect 阶段的人脸检测器权重。
   cnn_detector_path: resources/dlib/mmod_human_face_detector.dat
+  # detect 阶段的 68 点关键点模型。
   face_predictor_path: resources/dlib/shape_predictor_68_face_landmarks.dat
+  # align 阶段的人脸对齐模板。
   mean_face_path: resources/avhubert/20words_mean_face.npy
 
+# 供 manifest 生成和统一说明复用的预处理元信息。
+preprocess:
+  manifest_names:
+    - train
+    - val
+    - test
+  # 兼容旧版字段，当前训练主脚本不直接读取。
+  nshard: 1
+  rank: 0
+  crop_width: 96
+  crop_height: 96
+  start_idx: 48
+  stop_idx: 68
+  window_margin: 12
+  fps: 25
+  save_landmarks: true
+  strict: true
+
+# 训练时的数据裁剪与 batch 组织参数。
 data:
   max_frames: 300
   pad_to_batch_max: true
@@ -29,16 +63,19 @@ data:
   shuffle_train: true
   drop_last_train: false
 
+# 当前 baseline 固定为 frozen backbone + linear probe。
 model:
   freeze_backbone: true
 
+# GPU 训练参数。
 train:
   seed: 42
-  # Default host: 2 x RTX 4090 48G.
+  # 多卡列表；长度大于 1 时进入 DDP。
   devices: [0,1]
   backend: nccl
   master_addr: 127.0.0.1
   master_port: 29501
+  # MAVOS-DD 当前默认训练轮数高于另外两套数据集。
   epochs: 100
   batch_size: 4
   num_workers: 8
@@ -48,14 +85,15 @@ train:
   amp: false
   log_interval: 20
 
+# CPU 音频缓存配置。
 audio_cache:
-  # Tuned for a 72-core host while leaving headroom for ffmpeg and I/O.
   num_procs: 12
   cpu_threads_per_worker: 4
   start_method: spawn
   show_progress: true
   stack_order_audio: 4
 
+# 日志和曲线图输出配置。
 logging:
   level: INFO
   train_log_filename: train.log

@@ -83,9 +83,76 @@ def detect_landmarks_for_frame(frame: np.ndarray, detector, cnn_detector, predic
     return coords
 
 
-def detect_landmarks_for_video(video_path: Path, detector, cnn_detector, predictor) -> list[np.ndarray | None]:
+def _extract_rects(detections) -> list:
+    return [getattr(result, "rect", result) for result in detections]
+
+
+def _predict_landmarks(gray_frame: np.ndarray, rects: list, predictor) -> np.ndarray | None:
+    if not rects:
+        return None
+
+    shape = predictor(gray_frame, rects[0])
+    coords = np.zeros((68, 2), dtype=np.float32)
+    for index in range(68):
+        coords[index] = (shape.part(index).x, shape.part(index).y)
+    return coords
+
+
+def _normalize_batch_detections(raw_outputs, batch_size: int) -> list[list]:
+    outputs = list(raw_outputs)
+    if batch_size == 1 and outputs and hasattr(outputs[0], "rect"):
+        return [outputs]
+    if len(outputs) != batch_size:
+        raise RuntimeError(
+            f"Unexpected batched detector output size: expected {batch_size}, got {len(outputs)}."
+        )
+    return [list(item) for item in outputs]
+
+
+def detect_landmarks_for_frames(
+    frames: list[np.ndarray],
+    detector,
+    cnn_detector,
+    predictor,
+    detector_batch_size: int = 32,
+) -> list[np.ndarray | None]:
+    if cnn_detector is None:
+        raise RuntimeError("Strict CNN preprocessing requires `cnn_detector` to be initialized.")
+    if detector_batch_size < 1:
+        raise ValueError("detector_batch_size must be >= 1")
+
+    gray_frames = [cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) for frame in frames]
+    landmarks: list[np.ndarray | None] = []
+
+    for start in range(0, len(gray_frames), detector_batch_size):
+        gray_batch = gray_frames[start : start + detector_batch_size]
+        try:
+            raw_detections = cnn_detector(gray_batch)
+            detections_per_frame = _normalize_batch_detections(raw_detections, batch_size=len(gray_batch))
+        except TypeError:
+            detections_per_frame = [list(cnn_detector(gray_frame)) for gray_frame in gray_batch]
+
+        for gray_frame, detections in zip(gray_batch, detections_per_frame):
+            rects = _extract_rects(detections)
+            landmarks.append(_predict_landmarks(gray_frame, rects, predictor))
+    return landmarks
+
+
+def detect_landmarks_for_video(
+    video_path: Path,
+    detector,
+    cnn_detector,
+    predictor,
+    detector_batch_size: int = 32,
+) -> list[np.ndarray | None]:
     frames = load_video_frames(video_path)
-    return [detect_landmarks_for_frame(frame, detector, cnn_detector, predictor) for frame in frames]
+    return detect_landmarks_for_frames(
+        frames=frames,
+        detector=detector,
+        cnn_detector=cnn_detector,
+        predictor=predictor,
+        detector_batch_size=detector_batch_size,
+    )
 
 
 def linear_interpolate(landmarks: list[np.ndarray | None], start_idx: int, stop_idx: int):
@@ -267,23 +334,29 @@ def process_manifest(
     save_landmarks: bool = True,
     strict: bool = True,
     show_progress: bool = True,
+    detector_batch_size: int = 32,
     progress_callback=None,
 ) -> dict:
     if stage not in {"all", "detect", "align"}:
         raise ValueError(f"Unsupported stage: {stage}")
 
-    dlib = _load_dependencies()
     file_ids = shard_items(read_manifest_ids(manifest_path), rank=rank, nshard=nshard)
-    mean_face_landmarks = np.load(mean_face_path)
+    needs_detection = stage in {"all", "detect"}
+    needs_alignment = stage in {"all", "align"}
+    mean_face_landmarks = np.load(mean_face_path) if needs_alignment else None
 
     detector = None
-    if cnn_detector_path is None:
-        raise RuntimeError(
-            "Strict preprocessing requires `resources/dlib/mmod_human_face_detector.dat` "
-            "and does not fall back to the CPU frontal-face detector."
-        )
-    cnn_detector = build_cnn_detector(dlib, cnn_detector_path)
-    predictor = dlib.shape_predictor(str(face_predictor_path))
+    cnn_detector = None
+    predictor = None
+    if needs_detection:
+        dlib = _load_dependencies()
+        if cnn_detector_path is None:
+            raise RuntimeError(
+                "Strict preprocessing requires `resources/dlib/mmod_human_face_detector.dat` "
+                "and does not fall back to the CPU frontal-face detector."
+            )
+        cnn_detector = build_cnn_detector(dlib, cnn_detector_path)
+        predictor = dlib.shape_predictor(str(face_predictor_path))
 
     summary = {
         "stage": stage,
@@ -322,7 +395,14 @@ def process_manifest(
                     progress_callback(file_id)
                 continue
             try:
-                landmarks = detect_landmarks_for_video(raw_video_path, detector, cnn_detector, predictor)
+                frames = load_video_frames(raw_video_path)
+                landmarks = detect_landmarks_for_frames(
+                    frames=frames,
+                    detector=detector,
+                    cnn_detector=cnn_detector,
+                    predictor=predictor,
+                    detector_batch_size=detector_batch_size,
+                )
             except Exception as exc:
                 summary["failed_read_video"] += 1
                 summary["failed_files"].append({"file_id": file_id, "reason": f"read_video_failed:{exc}"})
@@ -343,12 +423,20 @@ def process_manifest(
                 progress_callback(file_id)
             continue
 
+        frames = None
         if landmark_path.exists():
             with landmark_path.open("rb") as handle:
                 landmarks = pickle.load(handle)
         elif stage == "all":
             try:
-                landmarks = detect_landmarks_for_video(raw_video_path, detector, cnn_detector, predictor)
+                frames = load_video_frames(raw_video_path)
+                landmarks = detect_landmarks_for_frames(
+                    frames=frames,
+                    detector=detector,
+                    cnn_detector=cnn_detector,
+                    predictor=predictor,
+                    detector_batch_size=detector_batch_size,
+                )
             except Exception as exc:
                 summary["failed_read_video"] += 1
                 summary["failed_files"].append({"file_id": file_id, "reason": f"read_video_failed:{exc}"})
@@ -379,7 +467,8 @@ def process_manifest(
             continue
 
         try:
-            frames = load_video_frames(raw_video_path)
+            if frames is None:
+                frames = load_video_frames(raw_video_path)
             cropped_frames = crop_mouth_sequence(
                 frames=frames,
                 landmarks=interpolated_landmarks,

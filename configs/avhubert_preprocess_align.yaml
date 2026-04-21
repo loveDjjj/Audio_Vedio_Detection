@@ -1,0 +1,53 @@
+# AV1M 预处理 align 阶段配置。
+# 当前专门用于：读取原始 mp4 + 已保存 landmarks -> 生成为训练可用的 mouth ROI 视频。
+
+paths:
+  split_dir: splits/av1m_official_real_fullfake
+  # align 阶段仍然需要读取原始视频帧做几何对齐与裁剪。
+  raw_video_root: /data/OneDay/AV-Deepfake1M
+  artifact_root: /data/OneDay/artifacts/avhubert/av1m_official_real_fullfake
+  manifest_dir: /data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/manifests
+  # align 阶段从这里读取 detect 阶段已生成的 landmarks。
+  landmark_dir: /data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/landmarks
+  # align 阶段最终写出的 mouth ROI 视频目录。
+  mouth_roi_root: /data/OneDay/artifacts/avhubert/av1m_official_real_fullfake/mouth_roi
+  cnn_detector_path: resources/dlib/mmod_human_face_detector.dat
+  face_predictor_path: resources/dlib/shape_predictor_68_face_landmarks.dat
+  # align 阶段必须使用均值脸模板完成标准化对齐。
+  mean_face_path: resources/avhubert/20words_mean_face.npy
+
+preprocess:
+  split_names:
+    - train
+    - val
+    - test
+  manifest_name: all
+  # align 阶段不做人脸检测，只消费已有 landmarks 并执行裁剪/写盘。
+  stage: align
+  crop_width: 96
+  crop_height: 96
+  start_idx: 48
+  stop_idx: 68
+  window_margin: 12
+  fps: 25
+  # 为了兼容统一接口保留；align 阶段通常只读取已有 landmarks，不重新生成。
+  save_landmarks: true
+  strict: true
+  # 该字段在 align 阶段不会成为主要瓶颈，但保留以便 detect/align 结构保持一致。
+  detector_batch_size: 32
+
+runtime:
+  # align 阶段当前按 CPU-only 设计，因此这里留空，不要求 CUDA。
+  devices: []
+  # CPU-only 时总 worker 数直接等于 workers_per_device。
+  workers_per_device: 6
+  # 每个 worker 的 CPU 线程预算，主要消耗在视频解码、仿射变换和视频重编码。
+  cpu_threads_per_worker: 8
+  start_method: spawn
+  show_main_progress: true
+  show_worker_logs: false
+
+logging:
+  level: INFO
+  main_log_filename: preprocess.log
+  worker_log_filename_template: preprocess_rank{rank}.log
