@@ -90,7 +90,7 @@ train:
   # 全局随机种子；DDP 下每个 rank 会在此基础上加 rank 偏移。
   seed: 42
   # 参与训练的 CUDA 设备编号列表；长度大于 1 时自动进入 DDP。
-  devices: [0,1]
+  devices: [1]
   # 多卡训练使用的分布式后端；NVIDIA GPU 默认使用 NCCL。
   backend: nccl
   # DDP 主进程地址和端口；同机多卡时默认用本机回环地址。
