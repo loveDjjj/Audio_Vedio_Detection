@@ -34,15 +34,15 @@ preprocess:
   save_landmarks: true
   strict: true
   # 该字段在 align 阶段不会成为主要瓶颈，但保留以便 detect/align 结构保持一致。
-  detector_batch_size: 32
+  detector_batch_size: 256
 
 runtime:
   # align 阶段当前按 CPU-only 设计，因此这里留空，不要求 CUDA。
   devices: []
   # CPU-only 时总 worker 数直接等于 workers_per_device。
-  workers_per_device: 6
+  workers_per_device: 24
   # 每个 worker 的 CPU 线程预算，主要消耗在视频解码、仿射变换和视频重编码。
-  cpu_threads_per_worker: 8
+  cpu_threads_per_worker: 6
   start_method: spawn
   show_main_progress: true
   show_worker_logs: false

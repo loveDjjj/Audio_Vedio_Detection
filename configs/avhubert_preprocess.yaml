@@ -47,16 +47,16 @@ preprocess:
   # 是否将读取失败/无脸等情况记为严格失败。
   strict: true
   # dlib CNN 检测批大小；这是单个 worker 内部的帧批量，不是跨进程的全局批量。
-  detector_batch_size: 32
+  detector_batch_size: 256
 
 # 预处理并发配置。
 runtime:
   # detect 阶段实际使用的 GPU 列表。
   devices: [1]
   # 每张 GPU 挂多少个预处理 worker；总 worker 数 = 设备数 x workers_per_device。
-  workers_per_device: 3
+  workers_per_device: 16
   # 每个 worker 的 CPU 线程预算；用于视频解码、landmark 后处理和 numpy/skimage 运算。
-  cpu_threads_per_worker: 8
+  cpu_threads_per_worker: 3
   # 多进程启动方式。
   start_method: spawn
   # 是否显示主进程总体进度条。
