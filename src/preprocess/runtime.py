@@ -26,6 +26,7 @@ SUMMARY_KEYS = [
     "failed_missing_video",
     "failed_read_video",
     "failed_missing_landmarks",
+    "failed_read_landmarks",
     "failed_no_landmarks",
     "failed_crop",
 ]

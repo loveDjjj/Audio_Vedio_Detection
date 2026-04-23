@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from src.data.audio_features import (
     compute_logfbank_features,
+    load_cached_audio_feature_array,
     resolve_audio_feature_path,
     resolve_ffmpeg_binary,
     stack_audio_features,
@@ -25,6 +26,7 @@ SUMMARY_KEYS = [
     "written_features",
     "skipped_existing_features",
     "failed_missing_video",
+    "failed_invalid_existing_features",
     "failed_feature_extract",
 ]
 
@@ -117,6 +119,7 @@ def _run_audio_cache_shard(
         "written_features": 0,
         "skipped_existing_features": 0,
         "failed_missing_video": 0,
+        "failed_invalid_existing_features": 0,
         "failed_feature_extract": 0,
         "failed_files": [],
     }
@@ -131,7 +134,15 @@ def _run_audio_cache_shard(
             _emit_progress(progress_queue)
             continue
         if feature_path.exists():
-            summary["skipped_existing_features"] += 1
+            try:
+                load_cached_audio_feature_array(feature_path, int(cache_cfg["stack_order_audio"]))
+            except Exception as exc:
+                summary["failed_invalid_existing_features"] += 1
+                summary["failed_files"].append(
+                    {"relative_path": relative_path, "reason": f"invalid_existing_feature:{exc}"}
+                )
+            else:
+                summary["skipped_existing_features"] += 1
             _emit_progress(progress_queue)
             continue
 

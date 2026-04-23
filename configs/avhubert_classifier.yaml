@@ -116,9 +116,9 @@ train:
 # 这一阶段完全在 CPU 上运行，但会调用 ffmpeg 子进程和 numpy/python_speech_features。
 audio_cache:
   # 并发 worker 进程数；这是全局进程数，不是每卡数。
-  num_procs: 12
+  num_procs: 32
   # 每个音频缓存 worker 限制的 CPU 线程数，用于控制 ffmpeg / BLAS 线程爆炸。
-  cpu_threads_per_worker: 4
+  cpu_threads_per_worker: 3
   # 多进程启动方式；与预处理保持一致，默认使用 spawn。
   start_method: spawn
   # 是否显示整体进度条。

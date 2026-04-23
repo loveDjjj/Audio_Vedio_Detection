@@ -287,7 +287,7 @@ def run_worker(local_rank: int, config_path: str, run_dir: str) -> None:
             lr=train_cfg["learning_rate"],
             weight_decay=train_cfg["weight_decay"],
         )
-        criterion = BCEWithLogitsLoss()
+        criterion = BCEWithLogitsLoss(reduction="none")
         scaler = torch.amp.GradScaler("cuda", enabled=train_cfg["amp"])
 
         best_path = run_dir_path / "best_head.pt"

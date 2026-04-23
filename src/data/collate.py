@@ -8,6 +8,12 @@ def collate_audio_video_batch(samples: list[dict], max_frames: int, pad_to_batch
     if not samples:
         return {}
 
+    valid_samples = [sample for sample in samples if float(sample.get("sample_weight", 1.0)) > 0.0]
+    if valid_samples:
+        samples = valid_samples
+    else:
+        samples = samples[:1]
+
     lengths: list[int] = []
     for sample in samples:
         sample_lengths = []
@@ -29,6 +35,7 @@ def collate_audio_video_batch(samples: list[dict], max_frames: int, pad_to_batch
 
     batch_size = len(samples)
     labels = torch.zeros((batch_size,), dtype=torch.float32)
+    sample_weights = torch.zeros((batch_size,), dtype=torch.float32)
     padding_mask = torch.ones((batch_size, target_frames), dtype=torch.bool)
     relative_paths: list[str] = []
 
@@ -57,6 +64,7 @@ def collate_audio_video_batch(samples: list[dict], max_frames: int, pad_to_batch
             videos[index, :usable_frames] = sample["video"][:usable_frames]
         padding_mask[index, :usable_frames] = False
         labels[index] = float(sample["label"])
+        sample_weights[index] = float(sample.get("sample_weight", 1.0))
         relative_paths.append(sample["relative_path"])
 
     if audios is not None:
@@ -69,6 +77,7 @@ def collate_audio_video_batch(samples: list[dict], max_frames: int, pad_to_batch
         "video": videos,
         "padding_mask": padding_mask,
         "labels": labels,
+        "sample_weights": sample_weights,
         "relative_paths": relative_paths,
     }
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import importlib
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,8 +11,11 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 
-from src.data.audio_features import resolve_audio_feature_path, stack_audio_features
+from src.data.audio_features import BASE_AUDIO_FEAT_DIM, load_cached_audio_feature_array, resolve_audio_feature_path
 from src.utils.avhubert_env import bootstrap_avhubert_repo
+
+
+CORRUPTED_SAMPLE_PLACEHOLDER_FRAMES = 8
 
 
 @dataclass(frozen=True)
@@ -50,6 +54,7 @@ class AV1MMouthRoiDataset(Dataset):
         self.audio_feature_root = audio_feature_root
         self.avhubert_repo = avhubert_repo
         self.training = training
+        self.image_crop_size = image_crop_size
         self.stack_order_audio = stack_order_audio
         self.normalize_audio = normalize_audio
         self.records: list[SampleRecord] = []
@@ -125,36 +130,54 @@ class AV1MMouthRoiDataset(Dataset):
                 "Run `python scripts/cache_av1m_audio_features.py` first."
             )
 
-        audio_features = np.load(audio_feature_path).astype(np.float32)
-        if audio_features.ndim != 2:
-            raise ValueError(f"Expected 2D cached audio features, got shape={audio_features.shape} from {audio_feature_path}")
-        # Backward compatibility: older cache files stored raw 26-dim features.
-        if audio_features.shape[1] != self.stack_order_audio * 26:
-            audio_features = stack_audio_features(audio_features, self.stack_order_audio)
+        audio_features = load_cached_audio_feature_array(audio_feature_path, self.stack_order_audio)
         audio = torch.from_numpy(audio_features.astype(np.float32))
         if self.normalize_audio:
             with torch.no_grad():
                 audio = F.layer_norm(audio, audio.shape[1:])
         return audio
 
+    def _build_corrupted_sample_placeholder(self, record: SampleRecord) -> dict:
+        return {
+            "relative_path": record.relative_path,
+            "label": record.label,
+            "audio": torch.zeros(
+                (CORRUPTED_SAMPLE_PLACEHOLDER_FRAMES, self.stack_order_audio * BASE_AUDIO_FEAT_DIM),
+                dtype=torch.float32,
+            ),
+            "video": torch.zeros(
+                (CORRUPTED_SAMPLE_PLACEHOLDER_FRAMES, self.image_crop_size, self.image_crop_size, 1),
+                dtype=torch.float32,
+            ),
+            "sample_weight": 0.0,
+        }
+
     def __getitem__(self, index: int) -> dict:
         record = self.records[index]
+        try:
+            frames = self.avhubert_utils.load_video(str(record.mouth_roi_path)).astype(np.float32)
+            frames = self.transform(frames).astype(np.float32)
+            frames = np.expand_dims(frames, axis=-1)
+            video = torch.from_numpy(frames)
+            audio = self._load_cached_audio_features(record.relative_path)
 
-        frames = self.avhubert_utils.load_video(str(record.mouth_roi_path)).astype(np.float32)
-        frames = self.transform(frames).astype(np.float32)
-        frames = np.expand_dims(frames, axis=-1)
-        video = torch.from_numpy(frames)
-        audio = self._load_cached_audio_features(record.relative_path)
-
-        diff = audio.shape[0] - video.shape[0]
-        if diff < 0:
-            audio = torch.cat([audio, audio.new_zeros((-diff, audio.shape[1]))], dim=0)
-        elif diff > 0:
-            audio = audio[:-diff]
+            diff = audio.shape[0] - video.shape[0]
+            if diff < 0:
+                audio = torch.cat([audio, audio.new_zeros((-diff, audio.shape[1]))], dim=0)
+            elif diff > 0:
+                audio = audio[:-diff]
+        except Exception as exc:
+            warnings.warn(
+                f"Skipping corrupted sample {record.relative_path}: {exc}",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            return self._build_corrupted_sample_placeholder(record)
 
         return {
             "relative_path": record.relative_path,
             "label": record.label,
             "audio": audio,
             "video": video,
+            "sample_weight": 1.0,
         }

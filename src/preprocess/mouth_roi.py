@@ -371,6 +371,7 @@ def process_manifest(
         "failed_missing_video": 0,
         "failed_read_video": 0,
         "failed_missing_landmarks": 0,
+        "failed_read_landmarks": 0,
         "failed_no_landmarks": 0,
         "failed_crop": 0,
         "failed_files": [],
@@ -425,8 +426,15 @@ def process_manifest(
 
         frames = None
         if landmark_path.exists():
-            with landmark_path.open("rb") as handle:
-                landmarks = pickle.load(handle)
+            try:
+                with landmark_path.open("rb") as handle:
+                    landmarks = pickle.load(handle)
+            except Exception as exc:
+                summary["failed_read_landmarks"] += 1
+                summary["failed_files"].append({"file_id": file_id, "reason": f"read_landmark_failed:{exc}"})
+                if progress_callback is not None:
+                    progress_callback(file_id)
+                continue
         elif stage == "all":
             try:
                 frames = load_video_frames(raw_video_path)

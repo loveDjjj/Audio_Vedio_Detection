@@ -14,6 +14,7 @@ def format_batch_debug(batch: dict) -> dict:
         "video_shape": tuple(batch["video"].shape) if batch.get("video") is not None else None,
         "padding_mask_shape": tuple(batch["padding_mask"].shape) if batch.get("padding_mask") is not None else None,
         "labels_shape": tuple(batch["labels"].shape) if batch.get("labels") is not None else None,
+        "sample_weights_shape": tuple(batch["sample_weights"].shape) if batch.get("sample_weights") is not None else None,
         "relative_paths": list(batch.get("relative_paths", [])),
     }
 
@@ -87,11 +88,16 @@ def run_epoch(
             video = video.to(device, non_blocking=True)
         padding_mask = batch["padding_mask"].to(device, non_blocking=True)
         targets = batch["labels"].to(device, non_blocking=True)
+        sample_weights = batch["sample_weights"].to(device, non_blocking=True)
 
         try:
             with torch_amp.autocast("cuda", enabled=amp and device.type == "cuda"):
                 video_logits, _frame_logits = model(audio=audio, video=video, padding_mask=padding_mask)
-                loss = criterion(video_logits, targets)
+                loss_values = criterion(video_logits, targets)
+                if loss_values.ndim == 0:
+                    loss_values = loss_values.expand_as(targets)
+                weighted_loss_sum = (loss_values * sample_weights).sum()
+                loss = weighted_loss_sum / sample_weights.sum().clamp_min(1.0)
         except RuntimeError:
             debug = format_batch_debug(batch)
             if device.type == "cuda":
@@ -118,11 +124,13 @@ def run_epoch(
                     torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip_norm)
                 optimizer.step()
 
-        batch_size = targets.shape[0]
-        total_loss += float(loss.detach().item()) * batch_size
-        total_examples += batch_size
-        all_logits.append(video_logits.detach().cpu())
-        all_targets.append(targets.detach().cpu())
+        valid_mask = sample_weights > 0
+        valid_examples = int(valid_mask.sum().item())
+        total_loss += float(weighted_loss_sum.detach().item())
+        total_examples += valid_examples
+        if valid_examples > 0:
+            all_logits.append(video_logits[valid_mask].detach().cpu())
+            all_targets.append(targets[valid_mask].detach().cpu())
 
         if is_train and log_interval > 0 and step % log_interval == 0 and _is_main_process():
             if progress_bar is not None:
