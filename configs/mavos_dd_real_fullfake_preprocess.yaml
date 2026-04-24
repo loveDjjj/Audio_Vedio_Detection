@@ -31,7 +31,7 @@ preprocess:
   fps: 25
   save_landmarks: true
   strict: true
-  detector_batch_size: 128
+  detector_batch_size: 16
 
 runtime:
   devices: [0, 1]

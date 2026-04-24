@@ -109,6 +109,25 @@ def _normalize_batch_detections(raw_outputs, batch_size: int) -> list[list]:
     return [list(item) for item in outputs]
 
 
+def _detect_landmarks_for_frame_batch(
+    frames: list[np.ndarray],
+    cnn_detector,
+    predictor,
+) -> list[np.ndarray | None]:
+    gray_batch = [cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) for frame in frames]
+    try:
+        raw_detections = cnn_detector(gray_batch)
+        detections_per_frame = _normalize_batch_detections(raw_detections, batch_size=len(gray_batch))
+    except TypeError:
+        detections_per_frame = [list(cnn_detector(gray_frame)) for gray_frame in gray_batch]
+
+    landmarks: list[np.ndarray | None] = []
+    for gray_frame, detections in zip(gray_batch, detections_per_frame):
+        rects = _extract_rects(detections)
+        landmarks.append(_predict_landmarks(gray_frame, rects, predictor))
+    return landmarks
+
+
 def detect_landmarks_for_frames(
     frames: list[np.ndarray],
     detector,
@@ -121,20 +140,11 @@ def detect_landmarks_for_frames(
     if detector_batch_size < 1:
         raise ValueError("detector_batch_size must be >= 1")
 
-    gray_frames = [cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) for frame in frames]
     landmarks: list[np.ndarray | None] = []
 
-    for start in range(0, len(gray_frames), detector_batch_size):
-        gray_batch = gray_frames[start : start + detector_batch_size]
-        try:
-            raw_detections = cnn_detector(gray_batch)
-            detections_per_frame = _normalize_batch_detections(raw_detections, batch_size=len(gray_batch))
-        except TypeError:
-            detections_per_frame = [list(cnn_detector(gray_frame)) for gray_frame in gray_batch]
-
-        for gray_frame, detections in zip(gray_batch, detections_per_frame):
-            rects = _extract_rects(detections)
-            landmarks.append(_predict_landmarks(gray_frame, rects, predictor))
+    for start in range(0, len(frames), detector_batch_size):
+        frame_batch = frames[start : start + detector_batch_size]
+        landmarks.extend(_detect_landmarks_for_frame_batch(frame_batch, cnn_detector, predictor))
     return landmarks
 
 
@@ -145,14 +155,31 @@ def detect_landmarks_for_video(
     predictor,
     detector_batch_size: int = 32,
 ) -> list[np.ndarray | None]:
-    frames = load_video_frames(video_path)
-    return detect_landmarks_for_frames(
-        frames=frames,
-        detector=detector,
-        cnn_detector=cnn_detector,
-        predictor=predictor,
-        detector_batch_size=detector_batch_size,
-    )
+    if cnn_detector is None:
+        raise RuntimeError("Strict CNN preprocessing requires `cnn_detector` to be initialized.")
+    if detector_batch_size < 1:
+        raise ValueError("detector_batch_size must be >= 1")
+
+    capture = cv2.VideoCapture(str(video_path))
+    landmarks: list[np.ndarray | None] = []
+    frame_batch: list[np.ndarray] = []
+    try:
+        while capture.isOpened():
+            ok, frame = capture.read()
+            if not ok:
+                break
+            frame_batch.append(frame)
+            if len(frame_batch) == detector_batch_size:
+                landmarks.extend(_detect_landmarks_for_frame_batch(frame_batch, cnn_detector, predictor))
+                frame_batch = []
+        if frame_batch:
+            landmarks.extend(_detect_landmarks_for_frame_batch(frame_batch, cnn_detector, predictor))
+    finally:
+        capture.release()
+
+    if not landmarks:
+        raise ValueError(f"Unable to read frames from {video_path}")
+    return landmarks
 
 
 def linear_interpolate(landmarks: list[np.ndarray | None], start_idx: int, stop_idx: int):
@@ -396,9 +423,8 @@ def process_manifest(
                     progress_callback(file_id)
                 continue
             try:
-                frames = load_video_frames(raw_video_path)
-                landmarks = detect_landmarks_for_frames(
-                    frames=frames,
+                landmarks = detect_landmarks_for_video(
+                    raw_video_path,
                     detector=detector,
                     cnn_detector=cnn_detector,
                     predictor=predictor,

@@ -189,7 +189,25 @@ class PreprocessOptimizationTest(unittest.TestCase):
         ]
         detector = FakeBatchDetector()
 
-        with mock.patch("src.preprocess.mouth_roi.load_video_frames", return_value=frames):
+        class FakeCapture:
+            def __init__(self, frames):
+                self.frames = list(frames)
+                self.released = False
+
+            def isOpened(self):
+                return not self.released
+
+            def read(self):
+                if not self.frames:
+                    return False, None
+                return True, self.frames.pop(0)
+
+            def release(self):
+                self.released = True
+
+        fake_capture = FakeCapture(frames)
+
+        with mock.patch("src.preprocess.mouth_roi.cv2.VideoCapture", return_value=fake_capture):
             landmarks = mouth_roi.detect_landmarks_for_video(
                 Path("sample.mp4"),
                 detector=None,
@@ -200,6 +218,51 @@ class PreprocessOptimizationTest(unittest.TestCase):
         self.assertEqual(len(landmarks), 3)
         self.assertEqual(len(detector.calls), 1)
         self.assertIsInstance(detector.calls[0], list)
+
+    def test_process_manifest_detect_streams_video_without_full_frame_load(self) -> None:
+        root = self._temp_dir()
+        raw_root = root / "raw"
+        landmark_root = root / "landmarks"
+        mouth_root = root / "mouth"
+        raw_root.mkdir(parents=True)
+        landmark_root.mkdir(parents=True)
+        mouth_root.mkdir(parents=True)
+
+        file_id = "sample"
+        (raw_root / f"{file_id}.mp4").write_bytes(b"fake")
+        manifest_path = root / "all.list"
+        manifest_path.write_text(f"{file_id}\n", encoding="utf-8")
+        mean_face_path = root / "mean_face.npy"
+        np.save(mean_face_path, np.zeros((68, 2), dtype=np.float32))
+
+        landmark = np.zeros((68, 2), dtype=np.float32)
+        fake_dlib = mock.Mock()
+        fake_dlib.shape_predictor.return_value = mock.Mock()
+
+        with mock.patch("src.preprocess.mouth_roi._load_dependencies", return_value=fake_dlib):
+            with mock.patch("src.preprocess.mouth_roi.build_cnn_detector", return_value=object()):
+                with mock.patch(
+                    "src.preprocess.mouth_roi.load_video_frames",
+                    side_effect=AssertionError("detect stage should not load the full video into memory"),
+                ):
+                    with mock.patch(
+                        "src.preprocess.mouth_roi.detect_landmarks_for_video",
+                        return_value=[landmark],
+                    ) as mock_detect_video:
+                        summary = mouth_roi.process_manifest(
+                            raw_video_root=raw_root,
+                            manifest_path=manifest_path,
+                            landmark_root=landmark_root,
+                            mouth_roi_root=mouth_root,
+                            face_predictor_path=root / "shape_predictor.dat",
+                            mean_face_path=mean_face_path,
+                            cnn_detector_path=root / "cnn_detector.dat",
+                            stage="detect",
+                            show_progress=False,
+                        )
+
+        self.assertEqual(summary["landmarks_written"], 1)
+        mock_detect_video.assert_called_once()
 
     def test_process_manifest_align_skips_dlib_initialization(self) -> None:
         root = self._temp_dir()
