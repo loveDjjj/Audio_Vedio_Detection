@@ -12,45 +12,69 @@
       "video_fake": true
     }
   },
-  "split_strategy": "official_split",
+  "split_strategy": "official_split_local_available",
   "source_videos": 87038,
+  "availability": {
+    "raw_video_root": "/data/OneDay/MAVOS-DD",
+    "requested_videos": 42930,
+    "available_videos": 5333,
+    "missing_videos": 37597,
+    "available_splits": {
+      "train": 2696,
+      "val": 501,
+      "test": 2136
+    },
+    "missing_splits": {
+      "test": 27682,
+      "train": 8401,
+      "val": 1514
+    },
+    "available_labels": {
+      "fake": 903,
+      "real": 4430
+    },
+    "missing_labels": {
+      "fake": 6470,
+      "real": 31127
+    }
+  },
   "splits": {
     "train": {
-      "videos": 11097,
+      "videos": 2696,
       "labels": {
-        "fake": 800,
-        "real": 10297
+        "fake": 100,
+        "real": 2596
       },
       "generative_methods": {
-        "memo": 800,
-        "real": 10297
+        "memo": 100,
+        "real": 2596
       }
     },
     "val": {
-      "videos": 2015,
+      "videos": 501,
       "labels": {
-        "fake": 300,
-        "real": 1715
+        "fake": 50,
+        "real": 451
       },
       "generative_methods": {
-        "memo": 300,
-        "real": 1715
+        "memo": 50,
+        "real": 451
       }
     },
     "test": {
-      "videos": 29818,
+      "videos": 2136,
       "labels": {
-        "fake": 6273,
-        "real": 23545
+        "fake": 753,
+        "real": 1383
       },
       "generative_methods": {
-        "echomimic": 1351,
-        "hififace": 1146,
-        "liveportrait": 1149,
-        "memo": 567,
-        "real": 23545,
-        "roop": 437,
-        "sonic": 1623
+        "echomimic": 79,
+        "hififace": 57,
+        "liveportrait": 236,
+        "memo": 55,
+        "real": 1383,
+        "roop": 48,
+        "sonic": 278
       }
     }
   }
