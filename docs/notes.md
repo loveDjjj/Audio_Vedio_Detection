@@ -1,43 +1,52 @@
 # Notes
 
 ## 本次需求
-为预处理、音频缓存和训练阶段增加“损坏即跳过”的容错机制，避免运行过程中因为损坏的缓存工件直接中断。直接触发问题的是 `align` 阶段读取被截断的 `landmarks.pkl` 时崩溃；本次要求也覆盖后续的音频缓存和训练读取阶段。
+
+为 MAVOS-DD 增加一个“本地已存在视频”划分脚本：仍然先按 metadata 筛选官方 split 下的 `real/real` 与 `fake/fake`，但只把 `/data/OneDay/MAVOS-DD` 下真实存在的 mp4 写入新的 split，方便在完整数据尚未下载完成时先跑通预处理和训练链路。
 
 ## 实际修改文件
 
-- src/preprocess/mouth_roi.py
-- src/preprocess/runtime.py
-- src/data/audio_features.py
-- src/data/audio_cache_runtime.py
-- src/data/av1m_mouth_roi_dataset.py
-- src/data/collate.py
-- src/train/engine.py
-- scripts/train_avhubert_classifier.py
-- tests/test_corruption_resilience.py
+- dataset/build_mavos_dd_local_available_real_fullfake_splits.py
+- src/data/mavos_dd_subset.py
+- tests/test_mavos_dd_subset.py
 - docs/notes.md
 - docs/logs/2026-04.md
 
 ## 关键改动
 
-- 为 `align` 阶段补充损坏 `landmarks/*.pkl` 的保护：`pickle.load()` 失败时记入 `failed_read_landmarks`，并继续处理后续样本。
-- 新增统一的缓存音频特征校验逻辑，要求已有 `.npy` 文件能够正常解码且维度符合当前堆叠规则，才视为可用缓存。
-- 调整音频缓存阶段：遇到已存在但损坏的 `.npy` 不再盲目跳过，而是记为 `failed_invalid_existing_features` 并继续。
-- 调整训练数据集读取逻辑：坏的 `mouth_roi` 或坏的音频特征不再在 `__getitem__()` 中直接抛异常，而是转换为零权重占位样本。
-- 调整 `collate` 和训练 `engine`：忽略零权重损坏样本，但仍保证 DDP 场景下 batch 结构稳定，不因整批局部坏样本导致不同步。
-- 将训练损失改为 `BCEWithLogitsLoss(reduction="none")`，以便按样本权重将损坏占位样本的贡献清零。
-- 新增回归测试，覆盖损坏 landmark 跳过、损坏音频缓存跳过、占位样本生成和零权重 batch 处理。
+- 新增 `build_local_available_real_fullfake_official_splits()`，复用现有 MAVOS-DD `real/real` vs `fake/fake` 官方 split 筛选逻辑，再根据 `raw_video_root / video_path` 的实际文件存在性过滤。
+- 新增 `dataset/build_mavos_dd_local_available_real_fullfake_splits.py`，默认输出到 `splits/mavos_dd_real_fullfake_local_available`，避免覆盖完整官方协议的 `splits/mavos_dd_real_fullfake`。
+- 新脚本的 `summary.json` 会记录 `availability`，包括 requested / available / missing 数量，以及按 split 和 label 统计的缺失情况。
+- 补充单元测试，覆盖本地存在视频保留、缺失视频剔除、非 `real/real` / `fake/fake` 样本继续排除。
+
+## 使用方式
+
+```bash
+python dataset/build_mavos_dd_local_available_real_fullfake_splits.py \
+  --metadata-root /data/OneDay/MAVOS-DD \
+  --raw-video-root /data/OneDay/MAVOS-DD \
+  --output-dir splits/mavos_dd_real_fullfake_local_available
+```
+
+如需让现有 MAVOS-DD 配置使用该子集，需要把相关 YAML 的 `paths.split_dir` 以及 artifact/output 路径显式切到 local-available 名称；本次没有自动修改现有配置。
 
 ## 验证
 
 ```bash
-python -m py_compile src/data/audio_features.py src/data/audio_cache_runtime.py src/data/av1m_mouth_roi_dataset.py src/data/collate.py src/preprocess/mouth_roi.py src/preprocess/runtime.py src/train/engine.py scripts/train_avhubert_classifier.py tests/test_corruption_resilience.py
-
-python -m unittest tests.test_fakeavceleb_wrappers tests.test_corruption_resilience -v
+python -m unittest tests.test_mavos_dd_subset -v
+python -m py_compile src/data/mavos_dd_subset.py dataset/build_mavos_dd_local_available_real_fullfake_splits.py tests/test_mavos_dd_subset.py
+python dataset/build_mavos_dd_local_available_real_fullfake_splits.py --help
 ```
 
-结果：通过。语法检查通过；单元测试通过。当前本地环境中有 3 个预期 skip，因为缺少 `python_speech_features` 和 `torch`。
+结果：通过。
+
+## 风险与限制
+
+- `splits/mavos_dd_real_fullfake_local_available` 是本地可用子集，不等同于完整官方 MAVOS-DD real/fullfake 协议。
+- 子集规模和类别分布取决于当前 `/data/OneDay/MAVOS-DD` 已下载文件；继续下载新视频后需要重新运行该脚本生成新的 split。
+- 当前脚本只检查 mp4 文件是否存在，不校验视频是否可解码；损坏文件仍由后续 preprocess 阶段处理。
 
 ## Git
 
-- branch: `main`
-- commit: `fix: skip corrupted cached preprocess and training artifacts`
+- branch: main
+- commit: 待确认
