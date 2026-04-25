@@ -36,8 +36,8 @@ runtime:
   # align 不要求 GPU，因此 devices 为空。
   devices: []
   # CPU-only 情况下总 worker 数为 6。
-  workers_per_device: 6
-  cpu_threads_per_worker: 8
+  workers_per_device: 3
+  cpu_threads_per_worker: 2
   start_method: spawn
   show_main_progress: true
   show_worker_logs: false

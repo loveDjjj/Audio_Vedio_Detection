@@ -31,12 +31,12 @@ preprocess:
   fps: 25
   save_landmarks: true
   strict: true
-  detector_batch_size: 16
+  detector_batch_size: 4
 
 runtime:
   devices: [0, 1]
-  workers_per_device: 1
-  cpu_threads_per_worker: 2
+  workers_per_device: 8
+  cpu_threads_per_worker: 4
   start_method: spawn
   show_main_progress: true
   show_worker_logs: false
