@@ -1,0 +1,81 @@
+{
+  "dataset": "MAVOS-DD",
+  "selection": {
+    "real": {
+      "label": "real",
+      "audio_fake": false,
+      "video_fake": false
+    },
+    "fake": {
+      "label": "fake",
+      "audio_fake": true,
+      "video_fake": true
+    }
+  },
+  "split_strategy": "official_split_local_available",
+  "source_videos": 87038,
+  "availability": {
+    "raw_video_root": "/data/OneDay/MAVOS-DD",
+    "requested_videos": 42930,
+    "available_videos": 5333,
+    "missing_videos": 37597,
+    "available_splits": {
+      "train": 2696,
+      "val": 501,
+      "test": 2136
+    },
+    "missing_splits": {
+      "test": 27682,
+      "train": 8401,
+      "val": 1514
+    },
+    "available_labels": {
+      "fake": 903,
+      "real": 4430
+    },
+    "missing_labels": {
+      "fake": 6470,
+      "real": 31127
+    }
+  },
+  "splits": {
+    "train": {
+      "videos": 2696,
+      "labels": {
+        "fake": 100,
+        "real": 2596
+      },
+      "generative_methods": {
+        "memo": 100,
+        "real": 2596
+      }
+    },
+    "val": {
+      "videos": 501,
+      "labels": {
+        "fake": 50,
+        "real": 451
+      },
+      "generative_methods": {
+        "memo": 50,
+        "real": 451
+      }
+    },
+    "test": {
+      "videos": 2136,
+      "labels": {
+        "fake": 753,
+        "real": 1383
+      },
+      "generative_methods": {
+        "echomimic": 79,
+        "hififace": 57,
+        "liveportrait": 236,
+        "memo": 55,
+        "real": 1383,
+        "roop": 48,
+        "sonic": 278
+      }
+    }
+  }
+}
