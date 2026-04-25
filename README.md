@@ -66,7 +66,7 @@ outputs/
 - [dataset/build_av1m_official_real_fullfake_splits.py](dataset/build_av1m_official_real_fullfake_splits.py)：从 `train_metadata.json` 和 `val_metadata.json` 中筛出 `real.mp4` 与 `fake_video_fake_audio.mp4`，保留官方 `train`，并将官方 `val` 按 clip 级随机切成 `val/test`。
 - [dataset/build_fakeavceleb_real_fullfake_splits.py](dataset/build_fakeavceleb_real_fullfake_splits.py)：从本地 FakeAVCeleb metadata 中筛出 `RealVideo-RealAudio` 和 `FakeVideo-FakeAudio`，保留全量样本并按 `label/method` 分层生成 `train/val/test` CSV。
 - [dataset/build_mavos_dd_real_fullfake_splits.py](dataset/build_mavos_dd_real_fullfake_splits.py)：从本地 MAVOS-DD metadata 中筛出官方 split 下全部 real/real 与 fake/fake 样本，生成 `train/val/test` CSV。
-- [dataset/download_mavos_dd_selected_files.py](dataset/download_mavos_dd_selected_files.py)：按当前 MAVOS-DD split CSV 中的 `relative_path` 下载被选中的视频文件。
+- [dataset/download_mavos_dd_selected_files.py](dataset/download_mavos_dd_selected_files.py)：按当前 MAVOS-DD split CSV 中的 `relative_path` 下载被选中的视频文件，默认使用 `--workers 4` 并行下载。
 - [scripts/build_avhubert_manifests.py](scripts/build_avhubert_manifests.py)：把 split CSV 转成 AV-HuBERT 预处理用的 `*.list`。
 - [scripts/cache_av1m_audio_features.py](scripts/cache_av1m_audio_features.py)：按多进程方式离线提取 raw mp4 的 16kHz mono 音频 logfbank，并直接缓存为训练最终读取的 stacked `.npy` 特征文件。
 - [scripts/cache_fakeavceleb_audio_features.py](scripts/cache_fakeavceleb_audio_features.py)：零参数入口，直接使用 `configs/fakeavceleb_classifier.yaml` 缓存 FakeAVCeleb 独立分支音频特征。
@@ -98,7 +98,7 @@ python scripts/cache_fakeavceleb_audio_features.py
 python scripts/train_fakeavceleb.py
 python scripts/inspect_mavos_dd_metadata.py --metadata-root /data/OneDay/MAVOS-DD
 python dataset/build_mavos_dd_real_fullfake_splits.py
-python dataset/download_mavos_dd_selected_files.py
+python dataset/download_mavos_dd_selected_files.py --workers 4
 python scripts/preprocess_mavos_dd_real_fullfake.py
 python scripts/cache_mavos_dd_real_fullfake_audio_features.py
 python scripts/train_mavos_dd_real_fullfake.py
